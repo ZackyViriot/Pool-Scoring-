@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 export default function PoolScoringComponent() {
     const [gameStarted, setGameStarted] = useState(false);
     const [objectBallsOnTable, setObjectBallsOnTable] = useState(15);
     const [activePlayer, setActivePlayer] = useState(1); // 1 or 2
     const [targetGoal, setTargetGoal] = useState(125);
+    const [gameTime, setGameTime] = useState(0);
+    const [isTimerRunning, setIsTimerRunning] = useState(false);
     
     const [player1, setPlayer1] = useState({
         name: "",
@@ -25,6 +27,29 @@ export default function PoolScoringComponent() {
         misses: 0,
         currentRun: 0
     });
+
+    useEffect(() => {
+        let interval;
+        if (isTimerRunning) {
+            interval = setInterval(() => {
+                setGameTime(prevTime => prevTime + 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isTimerRunning]);
+
+    const formatTime = (seconds) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const remainingSeconds = seconds % 60;
+        
+        const pad = (num) => num.toString().padStart(2, '0');
+        
+        if (hours > 0) {
+            return `${pad(hours)}:${pad(minutes)}:${pad(remainingSeconds)}`;
+        }
+        return `${pad(minutes)}:${pad(remainingSeconds)}`;
+    };
 
     const adjustScore = (playerNum, amount) => {
         const player = playerNum === 1 ? player1 : player2;
@@ -80,6 +105,8 @@ export default function PoolScoringComponent() {
         setGameStarted(true);
         setObjectBallsOnTable(15);
         setActivePlayer(1);
+        setIsTimerRunning(true);
+        setGameTime(0);
         // Apply handicaps to initial scores
         setPlayer1(prev => ({
             ...prev,
@@ -93,6 +120,7 @@ export default function PoolScoringComponent() {
 
     const endGame = () => {
         setGameStarted(false);
+        setIsTimerRunning(false);
         setPlayer1(prev => ({
             ...prev,
             score: 0,
@@ -151,6 +179,11 @@ export default function PoolScoringComponent() {
                             value={targetGoal}
                             onChange={(e) => setTargetGoal(Number(e.target.value))}
                         />
+                        {gameStarted && (
+                            <div className="text-xl text-gray-400 mb-4">
+                                {formatTime(gameTime)}
+                            </div>
+                        )}
                         <div className="text-xl mb-4">{objectBallsOnTable} object balls on table</div>
                         <button 
                             onClick={newRack}
