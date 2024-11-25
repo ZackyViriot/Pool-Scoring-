@@ -161,25 +161,25 @@ export default function PoolScoringComponent() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-6">
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-2 sm:p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
                 {/* Header Section */}
-                <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-6 mb-8">
-                    <div className="grid grid-cols-3 gap-8">
+                <div className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-6 mb-4 md:mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
                         {/* Player 1 Info */}
-                        <div className="space-y-4">
+                        <div className="space-y-2 md:space-y-4">
                             <input
                                 type="text"
                                 placeholder="Player 1"
-                                className="w-full bg-transparent border-b border-blue-500 text-2xl font-medium focus:outline-none focus:border-blue-400 transition-colors"
+                                className="w-full bg-transparent border-b border-blue-500 text-xl md:text-2xl font-medium focus:outline-none focus:border-blue-400 transition-colors"
                                 value={player1.name}
                                 onChange={(e) => setPlayer1({...player1, name: e.target.value})}
                             />
-                            <div className="flex items-center gap-4">
-                                <span className="text-gray-400">Handicap</span>
+                            <div className="flex items-center gap-2 md:gap-4">
+                                <span className="text-gray-400 text-sm md:text-base">Handicap</span>
                                 <input
                                     type="number"
-                                    className="w-20 bg-transparent border-b border-blue-500 text-xl text-center"
+                                    className="w-16 md:w-20 bg-transparent border-b border-blue-500 text-lg md:text-xl text-center"
                                     value={player1.handicap}
                                     onChange={(e) => setPlayer1({...player1, handicap: Number(e.target.value)})}
                                 />
@@ -187,27 +187,27 @@ export default function PoolScoringComponent() {
                         </div>
 
                         {/* Game Controls */}
-                        <div className="text-center space-y-4">
+                        <div className="text-center space-y-2 md:space-y-4 order-first md:order-none">
                             <div className="relative">
                                 <input
                                     type="number"
-                                    className="w-40 bg-transparent border-b-2 border-purple-500 text-5xl font-bold text-center focus:outline-none"
+                                    className="w-32 md:w-40 bg-transparent border-b-2 border-purple-500 text-4xl md:text-5xl font-bold text-center focus:outline-none"
                                     value={targetGoal}
                                     onChange={(e) => setTargetGoal(Number(e.target.value))}
                                 />
-                                <div className="text-purple-400 text-sm mt-1">TARGET SCORE</div>
+                                <div className="text-purple-400 text-xs md:text-sm mt-1">TARGET SCORE</div>
                             </div>
                             
                             {gameStarted && (
-                                <div className="text-2xl font-mono text-gray-400">
+                                <div className="text-xl md:text-2xl font-mono text-gray-400">
                                     {formatTime(gameTime)}
                                 </div>
                             )}
                             
-                            <div className="flex justify-center gap-4">
+                            <div className="flex justify-center gap-2 md:gap-4">
                                 <button 
                                     onClick={gameStarted ? endGame : startGame}
-                                    className={`px-6 py-2 rounded-full transition-colors ${
+                                    className={`px-4 md:px-6 py-1 md:py-2 rounded-full text-sm md:text-base transition-colors ${
                                         gameStarted 
                                             ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
                                             : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
@@ -218,7 +218,7 @@ export default function PoolScoringComponent() {
                                 
                                 <button 
                                     onClick={newRack}
-                                    className="px-6 py-2 rounded-full bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                                    className="px-4 md:px-6 py-1 md:py-2 rounded-full bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors text-sm md:text-base"
                                 >
                                     New Rack ({objectBallsOnTable})
                                 </button>
@@ -226,19 +226,19 @@ export default function PoolScoringComponent() {
                         </div>
 
                         {/* Player 2 Info */}
-                        <div className="space-y-4">
+                        <div className="space-y-2 md:space-y-4">
                             <input
                                 type="text"
                                 placeholder="Player 2"
-                                className="w-full bg-transparent border-b border-orange-500 text-2xl font-medium focus:outline-none focus:border-orange-400 transition-colors"
+                                className="w-full bg-transparent border-b border-orange-500 text-xl md:text-2xl font-medium focus:outline-none focus:border-orange-400 transition-colors"
                                 value={player2.name}
                                 onChange={(e) => setPlayer2({...player2, name: e.target.value})}
                             />
-                            <div className="flex items-center gap-4">
-                                <span className="text-gray-400">Handicap</span>
+                            <div className="flex items-center gap-2 md:gap-4">
+                                <span className="text-gray-400 text-sm md:text-base">Handicap</span>
                                 <input
                                     type="number"
-                                    className="w-20 bg-transparent border-b border-orange-500 text-xl text-center"
+                                    className="w-16 md:w-20 bg-transparent border-b border-orange-500 text-lg md:text-xl text-center"
                                     value={player2.handicap}
                                     onChange={(e) => setPlayer2({...player2, handicap: Number(e.target.value)})}
                                 />
@@ -248,117 +248,117 @@ export default function PoolScoringComponent() {
                 </div>
 
                 {/* Scoring Section */}
-                <div className="grid grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                     {/* Player 1 Score */}
-                    <div className={`bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-8 ${
+                    <div className={`bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-8 ${
                         activePlayer === 1 ? 'ring-2 ring-blue-500/50 animate-pulse' : ''
                     }`}>
-                        <div className="text-center mb-8">
-                            <div className="text-9xl font-bold text-blue-400">
+                        <div className="text-center mb-4 md:mb-8">
+                            <div className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold text-blue-400">
                                 {player1.score}
                             </div>
-                            <div className="flex justify-center gap-6 mt-4">
+                            <div className="flex justify-center gap-4 mt-4">
                                 <button 
                                     onClick={() => gameStarted && adjustScore(1, -1)}
-                                    className="text-4xl text-gray-400 hover:text-white w-16 h-16 rounded-full bg-gray-800/50 flex items-center justify-center transition-colors"
+                                    className="text-2xl md:text-4xl text-gray-400 hover:text-white w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-800/50 flex items-center justify-center transition-colors"
                                 >
                                     −
                                 </button>
                                 <button 
                                     onClick={() => gameStarted && adjustScore(1, 1)}
-                                    className="text-4xl text-gray-400 hover:text-white w-16 h-16 rounded-full bg-gray-800/50 flex items-center justify-center transition-colors"
+                                    className="text-2xl md:text-4xl text-gray-400 hover:text-white w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-800/50 flex items-center justify-center transition-colors"
                                 >
                                     +
                                 </button>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-black/20 rounded-lg p-4 text-center transform transition-transform hover:-translate-y-1">
-                                <div className="text-3xl text-blue-400">{player1.currentRun}</div>
-                                <div className="text-sm text-gray-400">Current Run</div>
+                        <div className="grid grid-cols-2 gap-2 md:gap-4">
+                            <div className="bg-black/20 rounded-lg p-3 md:p-4 text-center">
+                                <div className="text-2xl md:text-3xl text-blue-400">{player1.currentRun}</div>
+                                <div className="text-xs md:text-sm text-gray-400">Current Run</div>
                             </div>
-                            <div className="bg-black/20 rounded-lg p-4 text-center transform transition-transform hover:-translate-y-1">
-                                <div className="text-3xl text-blue-400">{player1.high}</div>
-                                <div className="text-sm text-gray-400">High Run</div>
+                            <div className="bg-black/20 rounded-lg p-3 md:p-4 text-center">
+                                <div className="text-2xl md:text-3xl text-blue-400">{player1.high}</div>
+                                <div className="text-xs md:text-sm text-gray-400">High Run</div>
                             </div>
                             <button 
                                 onClick={() => gameStarted && handleSafe(1)}
-                                className="bg-black/20 rounded-lg p-4 text-center hover:bg-blue-500/10 transition-colors"
+                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center hover:bg-blue-500/10 transition-colors"
                             >
-                                <div className="text-3xl text-blue-400">{player1.safes}</div>
-                                <div className="text-sm text-gray-400">Safes</div>
+                                <div className="text-2xl md:text-3xl text-blue-400">{player1.safes}</div>
+                                <div className="text-xs md:text-sm text-gray-400">Safes</div>
                             </button>
                             <button 
                                 onClick={() => gameStarted && handleMiss(1)}
-                                className="bg-black/20 rounded-lg p-4 text-center hover:bg-blue-500/10 transition-colors"
+                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center hover:bg-blue-500/10 transition-colors"
                             >
-                                <div className="text-3xl text-blue-400">{player1.misses}</div>
-                                <div className="text-sm text-gray-400">Misses</div>
+                                <div className="text-2xl md:text-3xl text-blue-400">{player1.misses}</div>
+                                <div className="text-xs md:text-sm text-gray-400">Misses</div>
                             </button>
                             <button 
                                 onClick={() => gameStarted && handleFoul(1)}
-                                className="bg-black/20 rounded-lg p-4 text-center hover:bg-red-500/10 transition-colors col-span-2"
+                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center hover:bg-red-500/10 transition-colors col-span-2"
                             >
-                                <div className="text-3xl text-red-400">{player1.fouls}</div>
-                                <div className="text-sm text-gray-400">Fouls</div>
+                                <div className="text-2xl md:text-3xl text-red-400">{player1.fouls}</div>
+                                <div className="text-xs md:text-sm text-gray-400">Fouls</div>
                             </button>
                         </div>
                     </div>
 
                     {/* Player 2 Score */}
-                    <div className={`bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-8 ${
+                    <div className={`bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-4 md:p-8 ${
                         activePlayer === 2 ? 'ring-2 ring-orange-500/50 animate-pulse' : ''
                     }`}>
-                        <div className="text-center mb-8">
-                            <div className="text-9xl font-bold text-orange-400">
+                        <div className="text-center mb-4 md:mb-8">
+                            <div className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold text-orange-400">
                                 {player2.score}
                             </div>
-                            <div className="flex justify-center gap-6 mt-4">
+                            <div className="flex justify-center gap-4 mt-4">
                                 <button 
                                     onClick={() => gameStarted && adjustScore(2, -1)}
-                                    className="text-4xl text-gray-400 hover:text-white w-16 h-16 rounded-full bg-gray-800/50 flex items-center justify-center transition-colors"
+                                    className="text-2xl md:text-4xl text-gray-400 hover:text-white w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-800/50 flex items-center justify-center transition-colors"
                                 >
                                     −
                                 </button>
                                 <button 
                                     onClick={() => gameStarted && adjustScore(2, 1)}
-                                    className="text-4xl text-gray-400 hover:text-white w-16 h-16 rounded-full bg-gray-800/50 flex items-center justify-center transition-colors"
+                                    className="text-2xl md:text-4xl text-gray-400 hover:text-white w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-800/50 flex items-center justify-center transition-colors"
                                 >
                                     +
                                 </button>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-black/20 rounded-lg p-4 text-center transform transition-transform hover:-translate-y-1">
-                                <div className="text-3xl text-orange-400">{player2.currentRun}</div>
-                                <div className="text-sm text-gray-400">Current Run</div>
+                        <div className="grid grid-cols-2 gap-2 md:gap-4">
+                            <div className="bg-black/20 rounded-lg p-3 md:p-4 text-center">
+                                <div className="text-2xl md:text-3xl text-orange-400">{player2.currentRun}</div>
+                                <div className="text-xs md:text-sm text-gray-400">Current Run</div>
                             </div>
-                            <div className="bg-black/20 rounded-lg p-4 text-center transform transition-transform hover:-translate-y-1">
-                                <div className="text-3xl text-orange-400">{player2.high}</div>
-                                <div className="text-sm text-gray-400">High Run</div>
+                            <div className="bg-black/20 rounded-lg p-3 md:p-4 text-center">
+                                <div className="text-2xl md:text-3xl text-orange-400">{player2.high}</div>
+                                <div className="text-xs md:text-sm text-gray-400">High Run</div>
                             </div>
                             <button 
                                 onClick={() => gameStarted && handleSafe(2)}
-                                className="bg-black/20 rounded-lg p-4 text-center hover:bg-orange-500/10 transition-colors"
+                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center hover:bg-orange-500/10 transition-colors"
                             >
-                                <div className="text-3xl text-orange-400">{player2.safes}</div>
-                                <div className="text-sm text-gray-400">Safes</div>
+                                <div className="text-2xl md:text-3xl text-orange-400">{player2.safes}</div>
+                                <div className="text-xs md:text-sm text-gray-400">Safes</div>
                             </button>
                             <button 
                                 onClick={() => gameStarted && handleMiss(2)}
-                                className="bg-black/20 rounded-lg p-4 text-center hover:bg-orange-500/10 transition-colors"
+                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center hover:bg-orange-500/10 transition-colors"
                             >
-                                <div className="text-3xl text-orange-400">{player2.misses}</div>
-                                <div className="text-sm text-gray-400">Misses</div>
+                                <div className="text-2xl md:text-3xl text-orange-400">{player2.misses}</div>
+                                <div className="text-xs md:text-sm text-gray-400">Misses</div>
                             </button>
                             <button 
                                 onClick={() => gameStarted && handleFoul(2)}
-                                className="bg-black/20 rounded-lg p-4 text-center hover:bg-red-500/10 transition-colors col-span-2"
+                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center hover:bg-red-500/10 transition-colors col-span-2"
                             >
-                                <div className="text-3xl text-red-400">{player2.fouls}</div>
-                                <div className="text-sm text-gray-400">Fouls</div>
+                                <div className="text-2xl md:text-3xl text-red-400">{player2.fouls}</div>
+                                <div className="text-xs md:text-sm text-gray-400">Fouls</div>
                             </button>
                         </div>
                     </div>
