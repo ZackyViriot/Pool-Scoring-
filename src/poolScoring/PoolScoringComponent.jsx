@@ -359,10 +359,19 @@ export default function PoolScoringComponent() {
             setPlayer1FoulHistory([]);
             setPlayer2FoulHistory([]);
             setTurnHistory([]);
+
+            // Apply handicaps at game start
+            const player1Handicap = Number(player1.handicap) || 0;
+            const player2Handicap = Number(player2.handicap) || 0;
+            
+            // If player 1 has higher handicap, player 2 starts with the difference
+            // If player 2 has higher handicap, player 1 starts with the difference
+            const handicapDifference = player1Handicap - player2Handicap;
+            
             // Reset scores and stats
             setPlayer1(prev => ({
                 ...prev,
-                score: 0,
+                score: handicapDifference < 0 ? Math.abs(handicapDifference) : 0,
                 high: 0,
                 safes: 0,
                 misses: 0,
@@ -370,9 +379,10 @@ export default function PoolScoringComponent() {
                 currentRun: 0,
                 bestGameRun: 0
             }));
+            
             setPlayer2(prev => ({
                 ...prev,
-                score: 0,
+                score: handicapDifference > 0 ? handicapDifference : 0,
                 high: 0,
                 safes: 0,
                 misses: 0,
@@ -380,6 +390,15 @@ export default function PoolScoringComponent() {
                 currentRun: 0,
                 bestGameRun: 0
             }));
+
+            // Add handicap application to turn history if there was a handicap
+            if (handicapDifference !== 0) {
+                if (handicapDifference > 0) {
+                    addToTurnHistory(2, 'Handicap Applied', handicapDifference);
+                } else if (handicapDifference < 0) {
+                    addToTurnHistory(1, 'Handicap Applied', Math.abs(handicapDifference));
+                }
+            }
         }
     };
 
@@ -514,20 +533,17 @@ export default function PoolScoringComponent() {
                                 value={player1.name}
                                 onChange={(e) => setPlayer1({...player1, name: e.target.value})}
                             />
-                            <div className="flex flex-col items-center">
-                                <input
-                                    type="number"
-                                    placeholder="0"
-                                    className={`w-16 bg-transparent border-b text-sm text-center
-                                        focus:outline-none transition-colors duration-200
-                                        ${isDarkMode 
-                                            ? 'border-blue-500 focus:border-blue-400' 
-                                            : 'border-blue-600 focus:border-blue-500'}`}
-                                    value={player1.handicap}
-                                    onChange={(e) => setPlayer1({...player1, handicap: Number(e.target.value)})}
-                                />
-                                <span className="text-xs opacity-60">Handicap</span>
-                            </div>
+                            <input
+                                type="number"
+                                placeholder="HC"
+                                className={`w-16 bg-transparent border-b text-sm text-center
+                                    focus:outline-none transition-colors duration-200
+                                    ${isDarkMode 
+                                        ? 'border-blue-500 focus:border-blue-400' 
+                                        : 'border-blue-600 focus:border-blue-500'}`}
+                                value={player1.handicap}
+                                onChange={(e) => setPlayer1({...player1, handicap: Number(e.target.value)})}
+                            />
                         </div>
 
                         {/* Game Controls */}
@@ -555,20 +571,17 @@ export default function PoolScoringComponent() {
 
                         {/* Player 2 Info */}
                         <div className="flex items-center gap-2 justify-end">
-                            <div className="flex flex-col items-center">
-                                <input
-                                    type="number"
-                                    placeholder="0"
-                                    className={`w-16 bg-transparent border-b text-sm text-center
-                                        focus:outline-none transition-colors duration-200
-                                        ${isDarkMode 
-                                            ? 'border-orange-500 focus:border-orange-400' 
-                                            : 'border-orange-600 focus:border-orange-500'}`}
-                                    value={player2.handicap}
-                                    onChange={(e) => setPlayer2({...player2, handicap: Number(e.target.value)})}
-                                />
-                                <span className="text-xs opacity-60">Handicap</span>
-                            </div>
+                            <input
+                                type="number"
+                                placeholder="HC"
+                                className={`w-16 bg-transparent border-b text-sm text-center
+                                    focus:outline-none transition-colors duration-200
+                                    ${isDarkMode 
+                                        ? 'border-orange-500 focus:border-orange-400' 
+                                        : 'border-orange-600 focus:border-orange-500'}`}
+                                value={player2.handicap}
+                                onChange={(e) => setPlayer2({...player2, handicap: Number(e.target.value)})}
+                            />
                             <input
                                 type="text"
                                 placeholder="Player 2"
