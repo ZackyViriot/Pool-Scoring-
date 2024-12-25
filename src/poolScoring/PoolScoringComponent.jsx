@@ -13,6 +13,13 @@ export default function PoolScoringComponent() {
     const [isTimerRunning, setIsTimerRunning] = useState(false);
     const [currentInning, setCurrentInning] = useState(1);
     const [breakPlayer, setBreakPlayer] = useState(1);
+    const [scoreHistory, setScoreHistory] = useState([]);
+    const [bestRun, setBestRun] = useState(0);
+    const [isBreakShot, setIsBreakShot] = useState(true);
+    const [player1FoulHistory, setPlayer1FoulHistory] = useState([]);
+    const [player2FoulHistory, setPlayer2FoulHistory] = useState([]);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [turnHistory, setTurnHistory] = useState([]);
     
     // Win modal state
     const [showWinModal, setShowWinModal] = useState(false);
@@ -45,7 +52,8 @@ export default function PoolScoringComponent() {
         safes: 0,
         misses: 0,
         fouls: 0,
-        currentRun: 0
+        currentRun: 0,
+        bestGameRun: 0
     });
 
     const [player2, setPlayer2] = useState({
@@ -56,7 +64,8 @@ export default function PoolScoringComponent() {
         safes: 0,
         misses: 0,
         fouls: 0,
-        currentRun: 0
+        currentRun: 0,
+        bestGameRun: 0
     });
 
     // Theme effect
@@ -123,17 +132,70 @@ export default function PoolScoringComponent() {
         };
     };
 
+    const undoLastAction = () => {
+        if (scoreHistory.length > 0) {
+            const lastAction = scoreHistory[scoreHistory.length - 1];
+            setPlayer1(lastAction.player1);
+            setPlayer2(lastAction.player2);
+            setActivePlayer(lastAction.activePlayer);
+            setCurrentInning(lastAction.currentInning);
+            setObjectBallsOnTable(lastAction.objectBallsOnTable);
+            setScoreHistory(prev => prev.slice(0, -1));
+        }
+    };
+
+    const saveGameState = () => {
+        setScoreHistory(prev => [...prev, {
+            player1: { ...player1 },
+            player2: { ...player2 },
+            activePlayer,
+            currentInning,
+            objectBallsOnTable
+        }]);
+    };
+
+    // Function to add turn to history
+    const addToTurnHistory = (playerNum, action, points) => {
+        const player = playerNum === 1 ? player1 : player2;
+        const turnEntry = {
+            inning: currentInning,
+            playerName: player.name || `Player ${playerNum}`,
+            playerNum,
+            action,
+            points,
+            timestamp: new Date().toLocaleTimeString(),
+            score: player.score + (points || 0)
+        };
+        setTurnHistory(prev => [...prev, turnEntry]);
+    };
+
     const adjustScore = (playerNum, amount) => {
+        // Only allow scoring for active player
+        if (playerNum !== activePlayer || !gameStarted) return;
+
+        // Save current state before making changes
+        saveGameState();
+
         const currentPlayerState = playerNum === 1 ? player1 : player2;
         const setCurrentPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
         const newScore = currentPlayerState.score + amount;
-        const newCurrentRun = currentPlayerState.currentRun + amount;
+        const newCurrentRun = amount > 0 ? currentPlayerState.currentRun + amount : 0;
+        const newBestGameRun = Math.max(currentPlayerState.bestGameRun, newCurrentRun);
         
+        // Add to turn history
+        addToTurnHistory(playerNum, 'Points', amount);
+
+        // Decrease ball count when points are scored
+        if (amount > 0) {
+            setObjectBallsOnTable(prev => Math.max(0, prev - 1));
+        }
+
         setCurrentPlayer(prev => ({
             ...prev,
             score: newScore,
             currentRun: newCurrentRun,
-            high: Math.max(prev.high, newCurrentRun)
+            high: Math.max(prev.high, newCurrentRun),
+            bestGameRun: newBestGameRun
         }));
 
         // Switch turns if the shot wasn't successful (amount <= 0)
@@ -161,44 +223,127 @@ export default function PoolScoringComponent() {
         }
     };
 
+    const checkThreeFouls = (playerNum) => {
+        const foulHistory = playerNum === 1 ? player1FoulHistory : player2FoulHistory;
+        const setFoulHistory = playerNum === 1 ? setPlayer1FoulHistory : setPlayer2FoulHistory;
+        const player = playerNum === 1 ? player1 : player2;
+        const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+
+        // Add current turn to foul history
+        const updatedHistory = [...foulHistory, true].slice(-3);
+        setFoulHistory(updatedHistory);
+
+        // Check if player has 3 fouls in their last 3 turns
+        if (updatedHistory.length === 3 && updatedHistory.every(foul => foul)) {
+            setPlayer(prev => ({
+                ...prev,
+                score: prev.score - 16,
+                fouls: prev.fouls + 1
+            }));
+            // Reset foul history after applying penalty
+            setFoulHistory([]);
+            return true;
+        }
+        return false;
+    };
+
+    // Add this function to check for 2 consecutive fouls
+    const hasTwoConsecutiveFouls = (playerNum) => {
+        const foulHistory = playerNum === 1 ? player1FoulHistory : player2FoulHistory;
+        return foulHistory.length === 2 && foulHistory.every(foul => foul);
+    };
+
     const handleFoul = (playerNum) => {
+        // Only allow actions for active player
+        if (playerNum !== activePlayer || !gameStarted) return;
+
+        saveGameState();
         const player = playerNum === 1 ? player1 : player2;
         const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
         
+        // Add to turn history
+        addToTurnHistory(playerNum, 'Foul', -1);
+
         setPlayer({
             ...player,
             score: player.score - 1,
             fouls: player.fouls + 1,
             currentRun: 0
         });
+
+        // Check and apply three-foul penalty if needed
+        const isThreeFoulPenalty = checkThreeFouls(playerNum);
+        if (isThreeFoulPenalty) {
+            addToTurnHistory(playerNum, 'Three Foul Penalty', -16);
+        }
         
         setActivePlayer(playerNum === 1 ? 2 : 1);
     };
 
     const handleSafe = (playerNum) => {
+        // Only allow actions for active player
+        if (playerNum !== activePlayer || !gameStarted) return;
+
+        saveGameState();
         const player = playerNum === 1 ? player1 : player2;
         const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        const setFoulHistory = playerNum === 1 ? setPlayer1FoulHistory : setPlayer2FoulHistory;
         
+        // Add to turn history
+        addToTurnHistory(playerNum, 'Safe', 0);
+
         setPlayer({
             ...player,
             safes: player.safes + 1,
             currentRun: 0
         });
         
+        setFoulHistory([]);
         setActivePlayer(playerNum === 1 ? 2 : 1);
     };
 
     const handleMiss = (playerNum) => {
+        // Only allow actions for active player
+        if (playerNum !== activePlayer || !gameStarted) return;
+
+        saveGameState();
         const player = playerNum === 1 ? player1 : player2;
         const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        const setFoulHistory = playerNum === 1 ? setPlayer1FoulHistory : setPlayer2FoulHistory;
         
+        // Add to turn history
+        addToTurnHistory(playerNum, 'Miss', 0);
+
         setPlayer({
             ...player,
             misses: player.misses + 1,
             currentRun: 0
         });
         
+        setFoulHistory([]);
         setActivePlayer(playerNum === 1 ? 2 : 1);
+    };
+
+    const handleBreakScratch = (playerNum) => {
+        // Only allow actions for active player
+        if (playerNum !== activePlayer || !gameStarted) return;
+
+        saveGameState();
+        const player = playerNum === 1 ? player1 : player2;
+        const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        
+        // Add to turn history
+        addToTurnHistory(playerNum, 'Break Scratch', -2);
+
+        setPlayer({
+            ...player,
+            score: player.score - 2,
+            fouls: player.fouls + 1,
+            currentRun: 0
+        });
+        
+        setActivePlayer(playerNum === 1 ? 2 : 1);
+        setIsBreakShot(false);
     };
 
     const startGame = () => {
@@ -208,6 +353,12 @@ export default function PoolScoringComponent() {
             setObjectBallsOnTable(15);
             setCurrentInning(1);
             setBreakPlayer(1);
+            setScoreHistory([]);
+            setBestRun(0);
+            setIsBreakShot(true);
+            setPlayer1FoulHistory([]);
+            setPlayer2FoulHistory([]);
+            setTurnHistory([]);
             // Reset scores and stats
             setPlayer1(prev => ({
                 ...prev,
@@ -216,7 +367,8 @@ export default function PoolScoringComponent() {
                 safes: 0,
                 misses: 0,
                 fouls: 0,
-                currentRun: 0
+                currentRun: 0,
+                bestGameRun: 0
             }));
             setPlayer2(prev => ({
                 ...prev,
@@ -225,7 +377,8 @@ export default function PoolScoringComponent() {
                 safes: 0,
                 misses: 0,
                 fouls: 0,
-                currentRun: 0
+                currentRun: 0,
+                bestGameRun: 0
             }));
         }
     };
@@ -281,10 +434,46 @@ export default function PoolScoringComponent() {
 
     const newRack = () => {
         setObjectBallsOnTable(15);
+        setIsBreakShot(true);
+    };
+
+    // Add this function to generate detailed player stats
+    const generateDetailedStats = (playerNum) => {
+        const player = playerNum === 1 ? player1 : player2;
+        const playerHistory = turnHistory.filter(turn => turn.playerNum === playerNum);
+        
+        const fouls = playerHistory.filter(turn => turn.action === 'Foul' || turn.action === 'Break Scratch');
+        const safes = playerHistory.filter(turn => turn.action === 'Safe');
+        const misses = playerHistory.filter(turn => turn.action === 'Miss');
+        const points = playerHistory.filter(turn => turn.action === 'Points' && turn.points > 0);
+        
+        return {
+            name: player.name || `Player ${playerNum}`,
+            totalScore: player.score,
+            bestRun: player.bestGameRun,
+            totalFouls: fouls.length,
+            totalSafes: safes.length,
+            totalMisses: misses.length,
+            foulDetails: fouls.map(f => ({
+                inning: f.inning,
+                type: f.action,
+                points: f.points
+            })),
+            safeDetails: safes.map(s => ({
+                inning: s.inning
+            })),
+            missDetails: misses.map(m => ({
+                inning: m.inning
+            })),
+            runDetails: points.map(p => ({
+                inning: p.inning,
+                points: p.points
+            }))
+        };
     };
 
     return (
-        <div className={`min-h-screen transition-colors duration-200
+        <div className={`min-h-screen h-screen overflow-hidden transition-colors duration-200
             ${isDarkMode 
                 ? 'bg-gradient-to-br from-gray-900 to-black text-white' 
                 : 'bg-gradient-to-br from-blue-50 to-white text-gray-900'}`}>
@@ -292,32 +481,32 @@ export default function PoolScoringComponent() {
             {/* Theme Toggle */}
             <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className="fixed top-4 right-4 p-2 rounded-full transition-all duration-200
+                className="fixed top-2 right-2 p-1 rounded-full transition-all duration-200
                     hover:scale-110 transform z-50 shadow-lg
                     dark:bg-gray-800 bg-white"
                 aria-label="Toggle theme"
             >
                 {isDarkMode ? (
-                    <SunIcon className="w-6 h-6 text-yellow-400" />
+                    <SunIcon className="w-4 h-4 text-yellow-400" />
                 ) : (
-                    <MoonIcon className="w-6 h-6 text-gray-700" />
+                    <MoonIcon className="w-4 h-4 text-gray-700" />
                 )}
             </button>
 
-            <div className="max-w-7xl mx-auto p-2 sm:p-4 md:p-6">
+            <div className="max-w-7xl mx-auto p-1 h-full flex flex-col">
                 {/* Header Section */}
-                <div className={`rounded-xl p-4 md:p-6 mb-4 md:mb-8 transition-colors duration-200
+                <div className={`rounded-lg p-2 mb-1 transition-colors duration-200
                     ${isDarkMode 
                         ? 'bg-black/30 backdrop-blur-sm border border-white/10' 
                         : 'bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg'}`}>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
+                    <div className="grid grid-cols-3 gap-2">
                         {/* Player 1 Info */}
-                        <div className="space-y-2 md:space-y-4">
+                        <div className="flex items-center gap-2">
                             <input
                                 type="text"
                                 placeholder="Player 1"
-                                className={`w-full bg-transparent border-b text-xl md:text-2xl font-medium 
+                                className={`w-full bg-transparent border-b text-lg font-medium 
                                     focus:outline-none transition-colors duration-200
                                     ${isDarkMode 
                                         ? 'border-blue-500 focus:border-blue-400' 
@@ -325,99 +514,65 @@ export default function PoolScoringComponent() {
                                 value={player1.name}
                                 onChange={(e) => setPlayer1({...player1, name: e.target.value})}
                             />
-                            <div className="flex items-center gap-2 md:gap-4">
-                                <span className={`text-sm md:text-base
-                                    ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                    Handicap
-                                </span>
+                            <div className="flex flex-col items-center">
                                 <input
                                     type="number"
-                                    className={`w-16 md:w-20 bg-transparent border-b text-lg md:text-xl 
-                                        text-center focus:outline-none transition-colors duration-200
+                                    placeholder="0"
+                                    className={`w-16 bg-transparent border-b text-sm text-center
+                                        focus:outline-none transition-colors duration-200
                                         ${isDarkMode 
                                             ? 'border-blue-500 focus:border-blue-400' 
                                             : 'border-blue-600 focus:border-blue-500'}`}
                                     value={player1.handicap}
                                     onChange={(e) => setPlayer1({...player1, handicap: Number(e.target.value)})}
                                 />
+                                <span className="text-xs opacity-60">Handicap</span>
                             </div>
                         </div>
 
                         {/* Game Controls */}
-                        <div className="text-center space-y-2 md:space-y-4">
-                            <div className="relative">
+                        <div className="flex flex-col items-center justify-center gap-1">
+                            <div className="flex items-center gap-2">
                                 <input
                                     type="number"
-                                    className={`w-32 md:w-40 bg-transparent border-b-2 text-4xl md:text-5xl 
-                                        font-bold text-center focus:outline-none transition-colors duration-200
+                                    className={`w-20 bg-transparent border-b text-2xl font-bold
+                                        text-center focus:outline-none transition-colors duration-200
                                         ${isDarkMode 
                                             ? 'border-purple-500' 
                                             : 'border-purple-600'}`}
                                     value={targetGoal}
                                     onChange={(e) => setTargetGoal(Number(e.target.value))}
                                 />
-                                <div className={`text-xs md:text-sm mt-1
-                                    ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
-                                    TARGET SCORE
-                                </div>
+                                <div className="text-xs opacity-60">TARGET</div>
                             </div>
                             
                             {gameStarted && (
-                                <div className={`text-xl md:text-2xl font-mono
-                                    ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                <div className="text-sm font-mono opacity-60">
                                     {formatTime(gameTime)}
                                 </div>
                             )}
-                            
-                            {gameStarted && (
-                                <div className={`flex flex-col gap-1 text-sm md:text-base
-                                    ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                    <div>Inning: {currentInning}</div>
-                                    <div>Break: {breakPlayer === 1 ? player1.name : player2.name}</div>
-                                </div>
-                            )}
-                            
-                            <div className="flex justify-center gap-2 md:gap-4">
-                                <button 
-                                    onClick={gameStarted ? endGame : startGame}
-                                    className={`px-4 md:px-6 py-1 md:py-2 rounded-full text-sm md:text-base 
-                                        transition-colors duration-200 ${
-                                        gameStarted 
-                                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
-                                            : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                                    }`}
-                                >
-                                    {gameStarted ? 'End Game' : 'Start Game'}
-                                </button>
-                                
-                                <button 
-                                    onClick={newRack}
-                                    className="px-4 md:px-6 py-1 md:py-2 rounded-full 
-                                        bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 
-                                        transition-colors duration-200 text-sm md:text-base"
-                                >
-                                    New Rack ({objectBallsOnTable})
-                                </button>
-
-                                {gameStarted && (
-                                    <button 
-                                        onClick={switchTurn}
-                                        className="px-4 md:px-6 py-1 md:py-2 rounded-full 
-                                            bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 
-                                            transition-colors duration-200 text-sm md:text-base"
-                                    >
-                                        Switch Turn
-                                    </button>
-                                )}
-                            </div>
                         </div>
 
                         {/* Player 2 Info */}
-                        <div className="space-y-2 md:space-y-4">
+                        <div className="flex items-center gap-2 justify-end">
+                            <div className="flex flex-col items-center">
+                                <input
+                                    type="number"
+                                    placeholder="0"
+                                    className={`w-16 bg-transparent border-b text-sm text-center
+                                        focus:outline-none transition-colors duration-200
+                                        ${isDarkMode 
+                                            ? 'border-orange-500 focus:border-orange-400' 
+                                            : 'border-orange-600 focus:border-orange-500'}`}
+                                    value={player2.handicap}
+                                    onChange={(e) => setPlayer2({...player2, handicap: Number(e.target.value)})}
+                                />
+                                <span className="text-xs opacity-60">Handicap</span>
+                            </div>
                             <input
                                 type="text"
                                 placeholder="Player 2"
-                                className={`w-full bg-transparent border-b text-xl md:text-2xl 
+                                className={`w-full bg-transparent border-b text-lg text-right
                                     font-medium focus:outline-none transition-colors duration-200
                                     ${isDarkMode 
                                         ? 'border-orange-500 focus:border-orange-400' 
@@ -425,53 +580,112 @@ export default function PoolScoringComponent() {
                                 value={player2.name}
                                 onChange={(e) => setPlayer2({...player2, name: e.target.value})}
                             />
-                            <div className="flex items-center gap-2 md:gap-4">
-                                <span className={`text-sm md:text-base
-                                    ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                    Handicap
-                                </span>
-                                <input
-                                    type="number"
-                                    className={`w-16 md:w-20 bg-transparent border-b text-lg md:text-xl 
-                                        text-center focus:outline-none transition-colors duration-200
-                                        ${isDarkMode 
-                                            ? 'border-orange-500 focus:border-orange-400' 
-                                            : 'border-orange-600 focus:border-orange-500'}`}
-                                    value={player2.handicap}
-                                    onChange={(e) => setPlayer2({...player2, handicap: Number(e.target.value)})}
-                                />
-                            </div>
                         </div>
+                    </div>
+
+                    {/* Game Controls Row */}
+                    <div className="flex justify-center gap-1 mt-1">
+                        <button 
+                            onClick={gameStarted ? endGame : startGame}
+                            className={`px-3 py-1 rounded-full text-xs
+                                transition-colors duration-200 ${
+                                gameStarted 
+                                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
+                                    : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                            }`}
+                        >
+                            {gameStarted ? 'End Game' : 'Start Game'}
+                        </button>
+                        
+                        {gameStarted && (
+                            <>
+                                <button 
+                                    onClick={newRack}
+                                    className="px-3 py-1 rounded-full text-xs
+                                        bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 
+                                        transition-colors duration-200"
+                                >
+                                    New Rack ({objectBallsOnTable})
+                                </button>
+
+                                <button 
+                                    onClick={switchTurn}
+                                    className="px-3 py-1 rounded-full text-xs
+                                        bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 
+                                        transition-colors duration-200"
+                                >
+                                    Switch
+                                </button>
+
+                                <button 
+                                    onClick={undoLastAction}
+                                    className="px-3 py-1 rounded-full text-xs
+                                        bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 
+                                        transition-colors duration-200"
+                                >
+                                    Undo
+                                </button>
+
+                                <button 
+                                    onClick={() => setShowHistoryModal(true)}
+                                    className="px-3 py-1 rounded-full text-xs
+                                        bg-green-500/20 text-green-400 hover:bg-green-500/30 
+                                        transition-colors duration-200"
+                                >
+                                    History
+                                </button>
+
+                                {isBreakShot && (
+                                    <button 
+                                        onClick={() => handleBreakScratch(activePlayer)}
+                                        className="px-3 py-1 rounded-full text-xs
+                                            bg-red-500/20 text-red-400 hover:bg-red-500/30 
+                                            transition-colors duration-200"
+                                    >
+                                        Break Scratch
+                                    </button>
+                                )}
+                            </>
+                        )}
                     </div>
                 </div>
 
                 {/* Scoring Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+                <div className="grid grid-cols-2 gap-1 h-[calc(100vh-180px)]">
                     {/* Player 1 Score */}
-                    <div className={`rounded-xl p-4 md:p-8 transition-colors duration-200
+                    <div className={`rounded-lg p-2 transition-colors duration-200 h-full flex flex-col relative
                         ${isDarkMode 
                             ? 'bg-black/30 backdrop-blur-sm border border-white/10' 
                             : 'bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg'}
-                        ${activePlayer === 1 ? 'ring-2 ring-blue-500/50 animate-pulse' : ''}`}>
+                        ${activePlayer === 1 ? 'ring-2 ring-blue-500/50 animate-pulse' : 'opacity-50'}
+                        ${activePlayer !== 1 && gameStarted ? 'pointer-events-none' : ''}`}>
                         
-                        <div className="text-center mb-4 md:mb-8">
-                            <div className={`text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold
+                        {/* Warning for 2 consecutive fouls */}
+                        {hasTwoConsecutiveFouls(1) && (
+                            <div className="absolute top-2 left-1/2 transform -translate-x-1/2
+                                bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-xs animate-pulse">
+                                Warning: Next Foul -16 Points
+                            </div>
+                        )}
+
+                        <div className="text-center flex-grow flex flex-col justify-center">
+                            <div className={`text-8xl font-bold mb-4
                                 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                                 {player1.score}
                             </div>
-                            <div className="flex justify-center gap-4 mt-4">
+                            <div className="flex justify-center gap-4 mb-4">
                                 <button 
                                     onClick={() => gameStarted && adjustScore(1, -1)}
-                                    className="text-2xl md:text-4xl text-gray-400 hover:text-white 
-                                        w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-800/50 
+                                    className="text-2xl text-gray-400 hover:text-white 
+                                        w-12 h-12 rounded-full bg-gray-800/50 
                                         flex items-center justify-center transition-colors"
                                 >
                                     −
                                 </button>
                                 <button 
                                     onClick={() => gameStarted && adjustScore(1, 1)}
-                                    className="text-2xl md:text-4xl text-gray-400 hover:text-white 
-                                        w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-800/50 
+                                    className="text-2xl text-gray-400 hover:text-white 
+                                        w-12 h-12 rounded-full bg-gray-800/50 
                                         flex items-center justify-center transition-colors"
                                 >
                                     +
@@ -479,81 +693,97 @@ export default function PoolScoringComponent() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 md:gap-4">
-                            <div className="bg-black/20 rounded-lg p-3 md:p-4 text-center">
-                                <div className={`text-2xl md:text-3xl
+                        <div className="grid grid-cols-3 gap-1">
+                            <div className="bg-black/20 rounded p-1 text-center">
+                                <div className={`text-xl
                                     ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                                     {player1.currentRun}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">Current Run</div>
+                                <div className="text-xs opacity-60">Run</div>
                             </div>
-                            <div className="bg-black/20 rounded-lg p-3 md:p-4 text-center">
-                                <div className={`text-2xl md:text-3xl
+                            <div className="bg-black/20 rounded p-1 text-center">
+                                <div className={`text-xl
                                     ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                                     {player1.high}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">High Run</div>
+                                <div className="text-xs opacity-60">High</div>
+                            </div>
+                            <div className="bg-black/20 rounded p-1 text-center">
+                                <div className={`text-xl
+                                    ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                                    {player1.bestGameRun}
+                                </div>
+                                <div className="text-xs opacity-60">Best</div>
                             </div>
                             <button 
                                 onClick={() => gameStarted && handleSafe(1)}
-                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center 
+                                className="bg-black/20 rounded p-1 text-center 
                                     hover:bg-blue-500/10 transition-colors"
                             >
-                                <div className={`text-2xl md:text-3xl
+                                <div className={`text-xl
                                     ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                                     {player1.safes}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">Safes</div>
+                                <div className="text-xs opacity-60">Safe</div>
                             </button>
                             <button 
                                 onClick={() => gameStarted && handleMiss(1)}
-                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center 
+                                className="bg-black/20 rounded p-1 text-center 
                                     hover:bg-blue-500/10 transition-colors"
                             >
-                                <div className={`text-2xl md:text-3xl
+                                <div className={`text-xl
                                     ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                                     {player1.misses}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">Misses</div>
+                                <div className="text-xs opacity-60">Miss</div>
                             </button>
                             <button 
                                 onClick={() => gameStarted && handleFoul(1)}
-                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center 
-                                    hover:bg-red-500/10 transition-colors col-span-2"
+                                className="bg-black/20 rounded p-1 text-center 
+                                    hover:bg-red-500/10 transition-colors"
                             >
-                                <div className="text-2xl md:text-3xl text-red-400">
+                                <div className="text-xl text-red-400">
                                     {player1.fouls}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">Fouls</div>
+                                <div className="text-xs opacity-60">Foul</div>
                             </button>
                         </div>
                     </div>
 
                     {/* Player 2 Score */}
-                    <div className={`rounded-xl p-4 md:p-8 transition-colors duration-200
+                    <div className={`rounded-lg p-2 transition-colors duration-200 h-full flex flex-col relative
                         ${isDarkMode 
                             ? 'bg-black/30 backdrop-blur-sm border border-white/10' 
                             : 'bg-white/80 backdrop-blur-sm border border-gray-200 shadow-lg'}
-                        ${activePlayer === 2 ? 'ring-2 ring-orange-500/50 animate-pulse' : ''}`}>
+                        ${activePlayer === 2 ? 'ring-2 ring-orange-500/50 animate-pulse' : 'opacity-50'}
+                        ${activePlayer !== 2 && gameStarted ? 'pointer-events-none' : ''}`}>
                         
-                        <div className="text-center mb-4 md:mb-8">
-                            <div className={`text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold
+                        {/* Warning for 2 consecutive fouls */}
+                        {hasTwoConsecutiveFouls(2) && (
+                            <div className="absolute top-2 left-1/2 transform -translate-x-1/2
+                                bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-xs animate-pulse">
+                                Warning: Next Foul -16 Points
+                            </div>
+                        )}
+
+                        <div className="text-center flex-grow flex flex-col justify-center">
+                            <div className={`text-8xl font-bold mb-4
                                 ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
                                 {player2.score}
                             </div>
-                            <div className="flex justify-center gap-4 mt-4">
+                            <div className="flex justify-center gap-4 mb-4">
                                 <button 
                                     onClick={() => gameStarted && adjustScore(2, -1)}
-                                    className="text-2xl md:text-4xl text-gray-400 hover:text-white 
-                                        w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-800/50 
+                                    className="text-2xl text-gray-400 hover:text-white 
+                                        w-12 h-12 rounded-full bg-gray-800/50 
                                         flex items-center justify-center transition-colors"
                                 >
                                     −
                                 </button>
                                 <button 
                                     onClick={() => gameStarted && adjustScore(2, 1)}
-                                    className="text-2xl md:text-4xl text-gray-400 hover:text-white 
-                                        w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-800/50 
+                                    className="text-2xl text-gray-400 hover:text-white 
+                                        w-12 h-12 rounded-full bg-gray-800/50 
                                         flex items-center justify-center transition-colors"
                                 >
                                     +
@@ -561,56 +791,143 @@ export default function PoolScoringComponent() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 md:gap-4">
-                            <div className="bg-black/20 rounded-lg p-3 md:p-4 text-center">
-                                <div className={`text-2xl md:text-3xl
+                        <div className="grid grid-cols-3 gap-1">
+                            <div className="bg-black/20 rounded p-1 text-center">
+                                <div className={`text-xl
                                     ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
                                     {player2.currentRun}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">Current Run</div>
+                                <div className="text-xs opacity-60">Run</div>
                             </div>
-                            <div className="bg-black/20 rounded-lg p-3 md:p-4 text-center">
-                                <div className={`text-2xl md:text-3xl
+                            <div className="bg-black/20 rounded p-1 text-center">
+                                <div className={`text-xl
                                     ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
                                     {player2.high}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">High Run</div>
+                                <div className="text-xs opacity-60">High</div>
+                            </div>
+                            <div className="bg-black/20 rounded p-1 text-center">
+                                <div className={`text-xl
+                                    ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
+                                    {player2.bestGameRun}
+                                </div>
+                                <div className="text-xs opacity-60">Best</div>
                             </div>
                             <button 
                                 onClick={() => gameStarted && handleSafe(2)}
-                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center 
+                                className="bg-black/20 rounded p-1 text-center 
                                     hover:bg-orange-500/10 transition-colors"
                             >
-                                <div className={`text-2xl md:text-3xl
+                                <div className={`text-xl
                                     ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
                                     {player2.safes}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">Safes</div>
+                                <div className="text-xs opacity-60">Safe</div>
                             </button>
                             <button 
                                 onClick={() => gameStarted && handleMiss(2)}
-                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center 
+                                className="bg-black/20 rounded p-1 text-center 
                                     hover:bg-orange-500/10 transition-colors"
                             >
-                                <div className={`text-2xl md:text-3xl
+                                <div className={`text-xl
                                     ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
                                     {player2.misses}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">Misses</div>
+                                <div className="text-xs opacity-60">Miss</div>
                             </button>
                             <button 
                                 onClick={() => gameStarted && handleFoul(2)}
-                                className="bg-black/20 rounded-lg p-3 md:p-4 text-center 
-                                    hover:bg-red-500/10 transition-colors col-span-2"
+                                className="bg-black/20 rounded p-1 text-center 
+                                    hover:bg-red-500/10 transition-colors"
                             >
-                                <div className="text-2xl md:text-3xl text-red-400">
+                                <div className="text-xl text-red-400">
                                     {player2.fouls}
                                 </div>
-                                <div className="text-xs md:text-sm text-gray-400">Fouls</div>
+                                <div className="text-xs opacity-60">Foul</div>
                             </button>
                         </div>
                     </div>
                 </div>
+
+                {/* Bottom Section with Game Info */}
+                <div className={`fixed bottom-0 left-0 right-0 
+                    ${isDarkMode ? 'bg-black/50' : 'bg-white/50'} 
+                    backdrop-blur-sm`}>
+                    {/* Game Info Row */}
+                    <div className="flex justify-center items-center gap-4 p-1">
+                        <div>
+                            Inning: {currentInning}
+                        </div>
+                        <div>
+                            Balls: {objectBallsOnTable}
+                        </div>
+                        <div>
+                            Break: {breakPlayer === 1 ? player1.name || 'Player 1' : player2.name || 'Player 2'}
+                        </div>
+                        <div>
+                            Turn: {activePlayer === 1 ? player1.name || 'Player 1' : player2.name || 'Player 2'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* History Modal */}
+                {showHistoryModal && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm 
+                        flex items-center justify-center z-50">
+                        <div className={`rounded-xl p-4 w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden
+                            shadow-2xl animate-fadeIn transition-colors duration-200
+                            ${isDarkMode 
+                                ? 'bg-gradient-to-b from-gray-800 to-gray-900 border border-white/10' 
+                                : 'bg-gradient-to-b from-white to-gray-50 border border-gray-200'}`}>
+                            
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold">Game History</h2>
+                                <button
+                                    onClick={() => setShowHistoryModal(false)}
+                                    className="p-2 rounded-full hover:bg-gray-700/50"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div className="overflow-y-auto max-h-[60vh] pr-2 space-y-2">
+                                {turnHistory.map((turn, index) => (
+                                    <div key={index} 
+                                        className={`p-2 rounded-lg flex items-center justify-between
+                                            ${isDarkMode ? 'bg-black/30' : 'bg-gray-100'}
+                                            ${turn.playerNum === 1 
+                                                ? 'border-l-4 border-blue-500' 
+                                                : 'border-l-4 border-orange-500'}`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <span className={`font-medium ${
+                                                turn.playerNum === 1 ? 'text-blue-400' : 'text-orange-400'
+                                            }`}>
+                                                {turn.playerName}
+                                            </span>
+                                            <span className="opacity-75">
+                                                Inning {turn.inning}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span>
+                                                {turn.action}
+                                                {turn.points !== undefined && turn.points !== 0 && (
+                                                    <span className={turn.points > 0 ? 'text-green-400' : 'text-red-400'}>
+                                                        {' '}({turn.points > 0 ? '+' : ''}{turn.points})
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <span className="text-sm opacity-60">
+                                                {turn.timestamp}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Win Modal */}
                 {showWinModal && (
@@ -624,61 +941,108 @@ export default function PoolScoringComponent() {
                         />
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm 
                             flex items-center justify-center z-50">
-                            <div className={`rounded-xl p-8 max-w-md mx-4 text-center 
+                            <div className={`rounded-xl p-8 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto
                                 shadow-2xl animate-fadeIn transition-colors duration-200
                                 ${isDarkMode 
                                     ? 'bg-gradient-to-b from-gray-800 to-gray-900 border border-white/10' 
                                     : 'bg-gradient-to-b from-white to-gray-50 border border-gray-200'}`}>
                                 
-                                <h2 className="text-4xl md:text-5xl font-bold text-purple-400 mb-4">
-                                    🏆 Winner! 🏆
+                                <h2 className="text-4xl font-bold text-center text-purple-400 mb-4">
+                                    🏆 Game Over 🏆
                                 </h2>
-                                <p className="text-2xl md:text-3xl font-medium mb-6">
-                                    {winner}
+                                <p className="text-2xl font-medium text-center mb-6">
+                                    Winner: {winner === 1 ? player1.name || 'Player 1' : player2.name || 'Player 2'}
                                 </p>
-                                <div className="space-y-3">
-                                    <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                                        Final Score: {winner === (player1.name || 'Player 1') ? player1.score : player2.score}
-                                    </p>
-                                    <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                                        Game Time: {formatTime(gameTime)}
-                                    </p>
-                                    {winnerStats && (
-                                        <div className="mt-4 grid grid-cols-2 gap-4">
-                                            <div className="bg-black/20 rounded-lg p-3">
-                                                <div className="text-xl text-purple-400">
-                                                    {winnerStats.accuracy}%
+
+                                <div className="grid grid-cols-2 gap-6">
+                                    {[1, 2].map(playerNum => {
+                                        const stats = generateDetailedStats(playerNum);
+                                        return (
+                                            <div key={playerNum} className={`space-y-4 p-4 rounded-lg
+                                                ${isDarkMode ? 'bg-black/30' : 'bg-gray-100'}`}>
+                                                <h3 className={`text-xl font-bold ${
+                                                    playerNum === 1 ? 'text-blue-400' : 'text-orange-400'
+                                                }`}>
+                                                    {stats.name}
+                                                </h3>
+                                                
+                                                <div className="grid grid-cols-2 gap-2 mb-4">
+                                                    <div className="bg-black/20 rounded p-2">
+                                                        <div className="text-2xl font-bold">{stats.totalScore}</div>
+                                                        <div className="text-xs opacity-60">Final Score</div>
+                                                    </div>
+                                                    <div className="bg-black/20 rounded p-2">
+                                                        <div className="text-2xl font-bold">{stats.bestRun}</div>
+                                                        <div className="text-xs opacity-60">Best Run</div>
+                                                    </div>
                                                 </div>
-                                                <div className="text-sm text-gray-400">Accuracy</div>
-                                            </div>
-                                            <div className="bg-black/20 rounded-lg p-3">
-                                                <div className="text-xl text-purple-400">
-                                                    {winnerStats.avgPointsPerInning}
+
+                                                <div className="space-y-4">
+                                                    {/* Fouls Section */}
+                                                    <div>
+                                                        <h4 className="font-medium mb-2">Fouls ({stats.totalFouls})</h4>
+                                                        <div className="space-y-1">
+                                                            {stats.foulDetails.map((foul, idx) => (
+                                                                <div key={idx} className="text-sm flex justify-between bg-black/10 rounded px-2 py-1">
+                                                                    <span>Inning {foul.inning}</span>
+                                                                    <span className="text-red-400">{foul.type} ({foul.points})</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Safes Section */}
+                                                    <div>
+                                                        <h4 className="font-medium mb-2">Safes ({stats.totalSafes})</h4>
+                                                        <div className="space-y-1">
+                                                            {stats.safeDetails.map((safe, idx) => (
+                                                                <div key={idx} className="text-sm flex justify-between bg-black/10 rounded px-2 py-1">
+                                                                    <span>Inning {safe.inning}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Misses Section */}
+                                                    <div>
+                                                        <h4 className="font-medium mb-2">Misses ({stats.totalMisses})</h4>
+                                                        <div className="space-y-1">
+                                                            {stats.missDetails.map((miss, idx) => (
+                                                                <div key={idx} className="text-sm flex justify-between bg-black/10 rounded px-2 py-1">
+                                                                    <span>Inning {miss.inning}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Runs Section */}
+                                                    <div>
+                                                        <h4 className="font-medium mb-2">Scoring Runs</h4>
+                                                        <div className="space-y-1">
+                                                            {stats.runDetails.map((run, idx) => (
+                                                                <div key={idx} className="text-sm flex justify-between bg-black/10 rounded px-2 py-1">
+                                                                    <span>Inning {run.inning}</span>
+                                                                    <span className="text-green-400">+{run.points}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="text-sm text-gray-400">Avg Points/Inning</div>
                                             </div>
-                                            <div className="bg-black/20 rounded-lg p-3">
-                                                <div className="text-xl text-purple-400">
-                                                    {winnerStats.totalShots}
-                                                </div>
-                                                <div className="text-sm text-gray-400">Total Shots</div>
-                                            </div>
-                                            <div className="bg-black/20 rounded-lg p-3">
-                                                <div className="text-xl text-purple-400">
-                                                    {winnerStats.foulsPerGame}
-                                                </div>
-                                                <div className="text-sm text-gray-400">Total Fouls</div>
-                                            </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })}
                                 </div>
-                                <button
-                                    onClick={closeWinModal}
-                                    className="mt-8 px-8 py-3 bg-purple-500/20 hover:bg-purple-500/30 
-                                        text-purple-300 rounded-full transition-colors text-lg"
-                                >
-                                    New Game
-                                </button>
+
+                                <div className="text-center mt-6">
+                                    <p className="opacity-60 mb-2">Game Time: {formatTime(gameTime)}</p>
+                                    <button
+                                        onClick={closeWinModal}
+                                        className="px-8 py-3 bg-purple-500/20 hover:bg-purple-500/30 
+                                            text-purple-300 rounded-full transition-colors text-lg"
+                                    >
+                                        New Game
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </>
