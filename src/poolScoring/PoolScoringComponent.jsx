@@ -553,13 +553,13 @@ export default function PoolScoringComponent() {
         <button 
             onClick={onClick}
             className={`bg-black/20 rounded-lg p-3 text-center 
-                hover:bg-opacity-30 transition-colors
-                ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
+                hover:bg-opacity-30 transition-all
+                ${onClick ? 'cursor-pointer hover:scale-105 transform' : 'cursor-default'}`}
         >
-            <div className={`text-3xl font-bold ${color}`}>
+            <div className={`text-4xl font-bold ${color}`}>
                 {value}
             </div>
-            <div className="text-sm opacity-60">{label}</div>
+            <div className="text-base font-semibold opacity-75">{label}</div>
         </button>
     );
 
