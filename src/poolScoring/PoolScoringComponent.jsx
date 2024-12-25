@@ -52,6 +52,7 @@ export default function PoolScoringComponent() {
         safes: 0,
         misses: 0,
         fouls: 0,
+        scratches: 0,
         currentRun: 0,
         bestGameRun: 0
     });
@@ -64,6 +65,7 @@ export default function PoolScoringComponent() {
         safes: 0,
         misses: 0,
         fouls: 0,
+        scratches: 0,
         currentRun: 0,
         bestGameRun: 0
     });
@@ -190,8 +192,8 @@ export default function PoolScoringComponent() {
             setObjectBallsOnTable(prev => {
                 const newCount = Math.max(0, prev - 1);
                 if (newCount === 0) {
-                    // Add a small delay before resetting to 14 so the user sees it hit 0
-                    setTimeout(() => setObjectBallsOnTable(14), 500);
+                    // Add a small delay before resetting to 15 so the user sees it hit 0
+                    setTimeout(() => setObjectBallsOnTable(15), 500);
                     return 0;
                 }
                 return newCount;
@@ -354,6 +356,34 @@ export default function PoolScoringComponent() {
         setIsBreakShot(false);
     };
 
+    const handleScratch = (playerNum) => {
+        // Only allow actions for active player
+        if (playerNum !== activePlayer || !gameStarted) return;
+
+        saveGameState();
+        const player = playerNum === 1 ? player1 : player2;
+        const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        
+        // Add to turn history
+        addToTurnHistory(playerNum, 'Scratch', -1);
+
+        setPlayer({
+            ...player,
+            score: player.score - 1,
+            scratches: player.scratches + 1,
+            fouls: player.fouls + 1,  // Increment fouls as well
+            currentRun: 0
+        });
+
+        // Check and apply three-foul penalty if needed
+        const isThreeFoulPenalty = checkThreeFouls(playerNum);
+        if (isThreeFoulPenalty) {
+            addToTurnHistory(playerNum, 'Three Foul Penalty', -16);
+        }
+        
+        setActivePlayer(playerNum === 1 ? 2 : 1);
+    };
+
     const startGame = () => {
         if (player1.name && player2.name) {
             setGameStarted(true);
@@ -461,7 +491,7 @@ export default function PoolScoringComponent() {
     };
 
     const newRack = () => {
-        setObjectBallsOnTable(14);
+        setObjectBallsOnTable(15);
         setIsBreakShot(true);
     };
 
@@ -501,12 +531,12 @@ export default function PoolScoringComponent() {
         };
     };
 
-    // Ball counter with clean design
+    // Update the ball counter to look like a pool ball
     const BallCounter = () => (
         <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
             w-24 h-24 rounded-full
             ${isDarkMode ? 'bg-gray-800' : 'bg-white'} 
-            shadow-lg border-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
+            shadow-lg border-4 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
             flex flex-col items-center justify-center
             z-10`}>
             <div className="text-5xl font-bold">
@@ -518,28 +548,13 @@ export default function PoolScoringComponent() {
         </div>
     );
 
-    // Clean score button design
-    const ScoreButton = ({ children, onClick, isDarkMode }) => (
-        <button 
-            onClick={onClick}
-            className={`text-2xl text-gray-200 hover:text-white 
-                w-12 h-12 rounded-full
-                flex items-center justify-center transition-all
-                ${isDarkMode ? 'bg-gray-800' : 'bg-gray-700'}
-                hover:scale-105 transform
-                shadow-lg`}
-        >
-            {children}
-        </button>
-    );
-
-    // Clean stat box design
+    // Update the stats grid styling
     const StatBox = ({ label, value, onClick, color = '' }) => (
         <button 
             onClick={onClick}
             className={`bg-black/20 rounded-lg p-3 text-center 
-                hover:bg-opacity-30 transition-all
-                ${onClick ? 'cursor-pointer hover:scale-105 transform' : 'cursor-default'}`}
+                hover:bg-opacity-30 transition-colors
+                ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
         >
             <div className={`text-3xl font-bold ${color}`}>
                 {value}
@@ -754,49 +769,72 @@ export default function PoolScoringComponent() {
                                 {player1.score}
                             </div>
                             <div className="flex justify-center gap-4 mb-4">
-                                <ScoreButton onClick={() => gameStarted && adjustScore(1, -1)} isDarkMode={isDarkMode}>
+                                <button 
+                                    onClick={() => gameStarted && adjustScore(1, -1)}
+                                    className="text-2xl text-gray-400 hover:text-white 
+                                        w-12 h-12 rounded-full bg-gray-800/50 
+                                        flex items-center justify-center transition-colors"
+                                >
                                     −
-                                </ScoreButton>
-                                <ScoreButton onClick={() => gameStarted && adjustScore(1, 1)} isDarkMode={isDarkMode}>
+                                </button>
+                                <button 
+                                    onClick={() => gameStarted && adjustScore(1, 1)}
+                                    className="text-2xl text-gray-400 hover:text-white 
+                                        w-12 h-12 rounded-full bg-gray-800/50 
+                                        flex items-center justify-center transition-colors"
+                                >
                                     +
-                                </ScoreButton>
+                                </button>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
-                            <StatBox 
-                                label="Run"
-                                value={player1.currentRun}
-                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
-                            />
-                            <StatBox 
-                                label="High"
-                                value={player1.high}
-                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
-                            />
-                            <StatBox 
-                                label="Best"
-                                value={player1.bestGameRun}
-                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
-                            />
-                            <StatBox 
-                                label="Safe"
-                                value={player1.safes}
-                                onClick={() => gameStarted && handleSafe(1)}
-                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
-                            />
-                            <StatBox 
-                                label="Miss"
-                                value={player1.misses}
-                                onClick={() => gameStarted && handleMiss(1)}
-                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
-                            />
-                            <StatBox 
-                                label="Foul"
-                                value={player1.fouls}
-                                onClick={() => gameStarted && handleFoul(1)}
-                                color="text-red-400"
-                            />
+                        {/* Player 1 Stats */}
+                        <div className="flex flex-col gap-2">
+                            {/* Top row - 4 metrics */}
+                            <div className="grid grid-cols-4 gap-2">
+                                <StatBox 
+                                    label="Run"
+                                    value={player1.currentRun}
+                                    color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                                />
+                                <StatBox 
+                                    label="High"
+                                    value={player1.high}
+                                    color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                                />
+                                <StatBox 
+                                    label="Best"
+                                    value={player1.bestGameRun}
+                                    color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                                />
+                                <StatBox 
+                                    label="Safe"
+                                    value={player1.safes}
+                                    onClick={() => gameStarted && handleSafe(1)}
+                                    color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                                />
+                            </div>
+                            {/* Bottom row - 3 metrics */}
+                            <div className="grid grid-cols-3 gap-2">
+                                <StatBox 
+                                    label="Miss"
+                                    value={player1.misses}
+                                    onClick={() => gameStarted && handleMiss(1)}
+                                    color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                                />
+                                <StatBox 
+                                    label="Scratch"
+                                    value={player1.scratches}
+                                    onClick={() => gameStarted && handleScratch(1)}
+                                    color="text-yellow-400"
+                                />
+                                <StatBox 
+                                    label="Foul"
+                                    value={player1.fouls}
+                                    onClick={() => gameStarted && handleFoul(1)}
+                                    color="text-red-400"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -825,49 +863,72 @@ export default function PoolScoringComponent() {
                                 {player2.score}
                             </div>
                             <div className="flex justify-center gap-4 mb-4">
-                                <ScoreButton onClick={() => gameStarted && adjustScore(2, -1)} isDarkMode={isDarkMode}>
+                                <button 
+                                    onClick={() => gameStarted && adjustScore(2, -1)}
+                                    className="text-2xl text-gray-400 hover:text-white 
+                                        w-12 h-12 rounded-full bg-gray-800/50 
+                                        flex items-center justify-center transition-colors"
+                                >
                                     −
-                                </ScoreButton>
-                                <ScoreButton onClick={() => gameStarted && adjustScore(2, 1)} isDarkMode={isDarkMode}>
+                                </button>
+                                <button 
+                                    onClick={() => gameStarted && adjustScore(2, 1)}
+                                    className="text-2xl text-gray-400 hover:text-white 
+                                        w-12 h-12 rounded-full bg-gray-800/50 
+                                        flex items-center justify-center transition-colors"
+                                >
                                     +
-                                </ScoreButton>
+                                </button>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
-                            <StatBox 
-                                label="Run"
-                                value={player2.currentRun}
-                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
-                            />
-                            <StatBox 
-                                label="High"
-                                value={player2.high}
-                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
-                            />
-                            <StatBox 
-                                label="Best"
-                                value={player2.bestGameRun}
-                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
-                            />
-                            <StatBox 
-                                label="Safe"
-                                value={player2.safes}
-                                onClick={() => gameStarted && handleSafe(2)}
-                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
-                            />
-                            <StatBox 
-                                label="Miss"
-                                value={player2.misses}
-                                onClick={() => gameStarted && handleMiss(2)}
-                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
-                            />
-                            <StatBox 
-                                label="Foul"
-                                value={player2.fouls}
-                                onClick={() => gameStarted && handleFoul(2)}
-                                color="text-red-400"
-                            />
+                        {/* Player 2 Stats */}
+                        <div className="flex flex-col gap-2">
+                            {/* Top row - 4 metrics */}
+                            <div className="grid grid-cols-4 gap-2">
+                                <StatBox 
+                                    label="Run"
+                                    value={player2.currentRun}
+                                    color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                                />
+                                <StatBox 
+                                    label="High"
+                                    value={player2.high}
+                                    color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                                />
+                                <StatBox 
+                                    label="Best"
+                                    value={player2.bestGameRun}
+                                    color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                                />
+                                <StatBox 
+                                    label="Safe"
+                                    value={player2.safes}
+                                    onClick={() => gameStarted && handleSafe(2)}
+                                    color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                                />
+                            </div>
+                            {/* Bottom row - 3 metrics */}
+                            <div className="grid grid-cols-3 gap-2">
+                                <StatBox 
+                                    label="Miss"
+                                    value={player2.misses}
+                                    onClick={() => gameStarted && handleMiss(2)}
+                                    color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                                />
+                                <StatBox 
+                                    label="Scratch"
+                                    value={player2.scratches}
+                                    onClick={() => gameStarted && handleScratch(2)}
+                                    color="text-yellow-400"
+                                />
+                                <StatBox 
+                                    label="Foul"
+                                    value={player2.fouls}
+                                    onClick={() => gameStarted && handleFoul(2)}
+                                    color="text-red-400"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
