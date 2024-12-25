@@ -11,6 +11,8 @@ export default function PoolScoringComponent() {
     const [targetGoal, setTargetGoal] = useState(125);
     const [gameTime, setGameTime] = useState(0);
     const [isTimerRunning, setIsTimerRunning] = useState(false);
+    const [currentInning, setCurrentInning] = useState(1);
+    const [breakPlayer, setBreakPlayer] = useState(1);
     
     // Win modal state
     const [showWinModal, setShowWinModal] = useState(false);
@@ -122,35 +124,40 @@ export default function PoolScoringComponent() {
     };
 
     const adjustScore = (playerNum, amount) => {
-        const player = playerNum === 1 ? player1 : player2;
-        const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        const currentPlayerState = playerNum === 1 ? player1 : player2;
+        const setCurrentPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        const newScore = currentPlayerState.score + amount;
+        const newCurrentRun = currentPlayerState.currentRun + amount;
         
-        const newScore = player.score + amount;
-        
-        setPlayer({
-            ...player,
+        setCurrentPlayer(prev => ({
+            ...prev,
             score: newScore,
-            currentRun: amount > 0 ? player.currentRun + 1 : 0,
-            high: amount > 0 ? Math.max(player.high, player.currentRun + 1) : player.high
-        });
+            currentRun: newCurrentRun,
+            high: Math.max(prev.high, newCurrentRun)
+        }));
 
+        // Switch turns if the shot wasn't successful (amount <= 0)
+        if (amount <= 0) {
+            setActivePlayer(playerNum === 1 ? 2 : 1);
+            // Reset current run for the player who just finished their turn
+            setCurrentPlayer(prev => ({
+                ...prev,
+                currentRun: 0
+            }));
+            // Increment inning when player 2 finishes their turn
+            if (playerNum === 2) {
+                setCurrentInning(prev => prev + 1);
+            }
+        }
+
+        // Check for win condition
         if (newScore >= targetGoal) {
-            const stats = calculateStats(player);
-            setWinner(player.name || `Player ${playerNum}`);
+            const stats = calculateStats(currentPlayerState);
+            setWinner(playerNum);
             setWinnerStats(stats);
             setShowWinModal(true);
             setIsTimerRunning(false);
             playWinSound();
-        }
-
-        if (amount > 0) {
-            setObjectBallsOnTable(prev => {
-                const newCount = prev - 1;
-                if (newCount === 0) {
-                    return 15;
-                }
-                return newCount;
-            });
         }
     };
 
@@ -195,19 +202,32 @@ export default function PoolScoringComponent() {
     };
 
     const startGame = () => {
-        setGameStarted(true);
-        setObjectBallsOnTable(15);
-        setActivePlayer(1);
-        setIsTimerRunning(true);
-        setGameTime(0);
-        setPlayer1(prev => ({
-            ...prev,
-            score: Number(prev.handicap)
-        }));
-        setPlayer2(prev => ({
-            ...prev,
-            score: Number(prev.handicap)
-        }));
+        if (player1.name && player2.name) {
+            setGameStarted(true);
+            setIsTimerRunning(true);
+            setObjectBallsOnTable(15);
+            setCurrentInning(1);
+            setBreakPlayer(1);
+            // Reset scores and stats
+            setPlayer1(prev => ({
+                ...prev,
+                score: 0,
+                high: 0,
+                safes: 0,
+                misses: 0,
+                fouls: 0,
+                currentRun: 0
+            }));
+            setPlayer2(prev => ({
+                ...prev,
+                score: 0,
+                high: 0,
+                safes: 0,
+                misses: 0,
+                fouls: 0,
+                currentRun: 0
+            }));
+        }
     };
 
     const endGame = () => {
@@ -240,9 +260,29 @@ export default function PoolScoringComponent() {
         endGame();
     };
 
+    const switchTurn = () => {
+        if (gameStarted) {
+            setActivePlayer(activePlayer === 1 ? 2 : 1);
+            // Reset current run for the player who just finished their turn
+            const currentPlayer = activePlayer === 1 ? player1 : player2;
+            const setCurrentPlayer = activePlayer === 1 ? setPlayer1 : setPlayer2;
+            
+            setCurrentPlayer(prev => ({
+                ...prev,
+                currentRun: 0
+            }));
+            
+            // Increment inning when player 2 finishes their turn
+            if (activePlayer === 2) {
+                setCurrentInning(prev => prev + 1);
+            }
+        }
+    };
+
     const newRack = () => {
         setObjectBallsOnTable(15);
     };
+
     return (
         <div className={`min-h-screen transition-colors duration-200
             ${isDarkMode 
@@ -329,6 +369,14 @@ export default function PoolScoringComponent() {
                                 </div>
                             )}
                             
+                            {gameStarted && (
+                                <div className={`flex flex-col gap-1 text-sm md:text-base
+                                    ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    <div>Inning: {currentInning}</div>
+                                    <div>Break: {breakPlayer === 1 ? player1.name : player2.name}</div>
+                                </div>
+                            )}
+                            
                             <div className="flex justify-center gap-2 md:gap-4">
                                 <button 
                                     onClick={gameStarted ? endGame : startGame}
@@ -350,6 +398,17 @@ export default function PoolScoringComponent() {
                                 >
                                     New Rack ({objectBallsOnTable})
                                 </button>
+
+                                {gameStarted && (
+                                    <button 
+                                        onClick={switchTurn}
+                                        className="px-4 md:px-6 py-1 md:py-2 rounded-full 
+                                            bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 
+                                            transition-colors duration-200 text-sm md:text-base"
+                                    >
+                                        Switch Turn
+                                    </button>
+                                )}
                             </div>
                         </div>
 
