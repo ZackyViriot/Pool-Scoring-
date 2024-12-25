@@ -358,7 +358,7 @@ export default function PoolScoringComponent() {
         if (player1.name && player2.name) {
             setGameStarted(true);
             setIsTimerRunning(true);
-            setObjectBallsOnTable(14);
+            setObjectBallsOnTable(15);
             setCurrentInning(1);
             setBreakPlayer(1);
             setScoreHistory([]);
