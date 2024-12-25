@@ -185,9 +185,17 @@ export default function PoolScoringComponent() {
         // Add to turn history
         addToTurnHistory(playerNum, 'Points', amount);
 
-        // Decrease ball count when points are scored
+        // Decrease ball count when points are scored and auto-reset when reaching 0
         if (amount > 0) {
-            setObjectBallsOnTable(prev => Math.max(0, prev - 1));
+            setObjectBallsOnTable(prev => {
+                const newCount = Math.max(0, prev - 1);
+                if (newCount === 0) {
+                    // Add a small delay before resetting to 15 so the user sees it hit 0
+                    setTimeout(() => setObjectBallsOnTable(15), 500);
+                    return 0;
+                }
+                return newCount;
+            });
         }
 
         setCurrentPlayer(prev => ({
@@ -434,6 +442,7 @@ export default function PoolScoringComponent() {
 
     const switchTurn = () => {
         if (gameStarted) {
+            saveGameState();
             setActivePlayer(activePlayer === 1 ? 2 : 1);
             // Reset current run for the player who just finished their turn
             const currentPlayer = activePlayer === 1 ? player1 : player2;
@@ -444,7 +453,7 @@ export default function PoolScoringComponent() {
                 currentRun: 0
             }));
             
-            // Increment inning when player 2 finishes their turn
+            // Increment inning when player 2's turn ends (completing a full inning)
             if (activePlayer === 2) {
                 setCurrentInning(prev => prev + 1);
             }
@@ -470,6 +479,7 @@ export default function PoolScoringComponent() {
             name: player.name || `Player ${playerNum}`,
             totalScore: player.score,
             bestRun: player.bestGameRun,
+            totalInnings: currentInning,
             totalFouls: fouls.length,
             totalSafes: safes.length,
             totalMisses: misses.length,
@@ -490,6 +500,38 @@ export default function PoolScoringComponent() {
             }))
         };
     };
+
+    // Update the ball counter to look like a pool ball
+    const BallCounter = () => (
+        <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
+            w-24 h-24 rounded-full
+            ${isDarkMode ? 'bg-gray-800' : 'bg-white'} 
+            shadow-lg border-4 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
+            flex flex-col items-center justify-center
+            z-10`}>
+            <div className="text-5xl font-bold">
+                {objectBallsOnTable}
+            </div>
+            <div className="text-xs opacity-60">
+                Balls
+            </div>
+        </div>
+    );
+
+    // Update the stats grid styling
+    const StatBox = ({ label, value, onClick, color = '' }) => (
+        <button 
+            onClick={onClick}
+            className={`bg-black/20 rounded-lg p-3 text-center 
+                hover:bg-opacity-30 transition-colors
+                ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
+        >
+            <div className={`text-3xl font-bold ${color}`}>
+                {value}
+            </div>
+            <div className="text-sm opacity-60">{label}</div>
+        </button>
+    );
 
     return (
         <div className={`min-h-screen h-screen overflow-hidden transition-colors duration-200
@@ -664,7 +706,7 @@ export default function PoolScoringComponent() {
                 </div>
 
                 {/* Scoring Section */}
-                <div className="grid grid-cols-2 gap-1 h-[calc(100vh-180px)]">
+                <div className="grid grid-cols-2 gap-1 h-[calc(100vh-180px)] relative">
                     {/* Player 1 Score */}
                     <div className={`rounded-lg p-2 transition-colors duration-200 h-full flex flex-col relative
                         ${isDarkMode 
@@ -706,62 +748,45 @@ export default function PoolScoringComponent() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-1">
-                            <div className="bg-black/20 rounded p-1 text-center">
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                    {player1.currentRun}
-                                </div>
-                                <div className="text-xs opacity-60">Run</div>
-                            </div>
-                            <div className="bg-black/20 rounded p-1 text-center">
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                    {player1.high}
-                                </div>
-                                <div className="text-xs opacity-60">High</div>
-                            </div>
-                            <div className="bg-black/20 rounded p-1 text-center">
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                    {player1.bestGameRun}
-                                </div>
-                                <div className="text-xs opacity-60">Best</div>
-                            </div>
-                            <button 
+                        <div className="grid grid-cols-3 gap-2">
+                            <StatBox 
+                                label="Run"
+                                value={player1.currentRun}
+                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                            />
+                            <StatBox 
+                                label="High"
+                                value={player1.high}
+                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                            />
+                            <StatBox 
+                                label="Best"
+                                value={player1.bestGameRun}
+                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                            />
+                            <StatBox 
+                                label="Safe"
+                                value={player1.safes}
                                 onClick={() => gameStarted && handleSafe(1)}
-                                className="bg-black/20 rounded p-1 text-center 
-                                    hover:bg-blue-500/10 transition-colors"
-                            >
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                    {player1.safes}
-                                </div>
-                                <div className="text-xs opacity-60">Safe</div>
-                            </button>
-                            <button 
+                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                            />
+                            <StatBox 
+                                label="Miss"
+                                value={player1.misses}
                                 onClick={() => gameStarted && handleMiss(1)}
-                                className="bg-black/20 rounded p-1 text-center 
-                                    hover:bg-blue-500/10 transition-colors"
-                            >
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                    {player1.misses}
-                                </div>
-                                <div className="text-xs opacity-60">Miss</div>
-                            </button>
-                            <button 
+                                color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                            />
+                            <StatBox 
+                                label="Foul"
+                                value={player1.fouls}
                                 onClick={() => gameStarted && handleFoul(1)}
-                                className="bg-black/20 rounded p-1 text-center 
-                                    hover:bg-red-500/10 transition-colors"
-                            >
-                                <div className="text-xl text-red-400">
-                                    {player1.fouls}
-                                </div>
-                                <div className="text-xs opacity-60">Foul</div>
-                            </button>
+                                color="text-red-400"
+                            />
                         </div>
                     </div>
+
+                    {/* Centered Ball Counter */}
+                    <BallCounter />
 
                     {/* Player 2 Score */}
                     <div className={`rounded-lg p-2 transition-colors duration-200 h-full flex flex-col relative
@@ -804,60 +829,40 @@ export default function PoolScoringComponent() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-1">
-                            <div className="bg-black/20 rounded p-1 text-center">
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-                                    {player2.currentRun}
-                                </div>
-                                <div className="text-xs opacity-60">Run</div>
-                            </div>
-                            <div className="bg-black/20 rounded p-1 text-center">
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-                                    {player2.high}
-                                </div>
-                                <div className="text-xs opacity-60">High</div>
-                            </div>
-                            <div className="bg-black/20 rounded p-1 text-center">
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-                                    {player2.bestGameRun}
-                                </div>
-                                <div className="text-xs opacity-60">Best</div>
-                            </div>
-                            <button 
+                        <div className="grid grid-cols-3 gap-2">
+                            <StatBox 
+                                label="Run"
+                                value={player2.currentRun}
+                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                            />
+                            <StatBox 
+                                label="High"
+                                value={player2.high}
+                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                            />
+                            <StatBox 
+                                label="Best"
+                                value={player2.bestGameRun}
+                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                            />
+                            <StatBox 
+                                label="Safe"
+                                value={player2.safes}
                                 onClick={() => gameStarted && handleSafe(2)}
-                                className="bg-black/20 rounded p-1 text-center 
-                                    hover:bg-orange-500/10 transition-colors"
-                            >
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-                                    {player2.safes}
-                                </div>
-                                <div className="text-xs opacity-60">Safe</div>
-                            </button>
-                            <button 
+                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                            />
+                            <StatBox 
+                                label="Miss"
+                                value={player2.misses}
                                 onClick={() => gameStarted && handleMiss(2)}
-                                className="bg-black/20 rounded p-1 text-center 
-                                    hover:bg-orange-500/10 transition-colors"
-                            >
-                                <div className={`text-xl
-                                    ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-                                    {player2.misses}
-                                </div>
-                                <div className="text-xs opacity-60">Miss</div>
-                            </button>
-                            <button 
+                                color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                            />
+                            <StatBox 
+                                label="Foul"
+                                value={player2.fouls}
                                 onClick={() => gameStarted && handleFoul(2)}
-                                className="bg-black/20 rounded p-1 text-center 
-                                    hover:bg-red-500/10 transition-colors"
-                            >
-                                <div className="text-xl text-red-400">
-                                    {player2.fouls}
-                                </div>
-                                <div className="text-xs opacity-60">Foul</div>
-                            </button>
+                                color="text-red-400"
+                            />
                         </div>
                     </div>
                 </div>
