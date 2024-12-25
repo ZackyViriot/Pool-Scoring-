@@ -190,8 +190,8 @@ export default function PoolScoringComponent() {
             setObjectBallsOnTable(prev => {
                 const newCount = Math.max(0, prev - 1);
                 if (newCount === 0) {
-                    // Add a small delay before resetting to 15 so the user sees it hit 0
-                    setTimeout(() => setObjectBallsOnTable(15), 500);
+                    // Add a small delay before resetting to 14 so the user sees it hit 0
+                    setTimeout(() => setObjectBallsOnTable(14), 500);
                     return 0;
                 }
                 return newCount;
@@ -358,7 +358,7 @@ export default function PoolScoringComponent() {
         if (player1.name && player2.name) {
             setGameStarted(true);
             setIsTimerRunning(true);
-            setObjectBallsOnTable(15);
+            setObjectBallsOnTable(14);
             setCurrentInning(1);
             setBreakPlayer(1);
             setScoreHistory([]);
@@ -461,7 +461,7 @@ export default function PoolScoringComponent() {
     };
 
     const newRack = () => {
-        setObjectBallsOnTable(15);
+        setObjectBallsOnTable(14);
         setIsBreakShot(true);
     };
 
@@ -501,12 +501,12 @@ export default function PoolScoringComponent() {
         };
     };
 
-    // Update the ball counter to look like a pool ball
+    // Ball counter with clean design
     const BallCounter = () => (
         <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
             w-24 h-24 rounded-full
             ${isDarkMode ? 'bg-gray-800' : 'bg-white'} 
-            shadow-lg border-4 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
+            shadow-lg border-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}
             flex flex-col items-center justify-center
             z-10`}>
             <div className="text-5xl font-bold">
@@ -518,13 +518,28 @@ export default function PoolScoringComponent() {
         </div>
     );
 
-    // Update the stats grid styling
+    // Clean score button design
+    const ScoreButton = ({ children, onClick, isDarkMode }) => (
+        <button 
+            onClick={onClick}
+            className={`text-2xl text-gray-200 hover:text-white 
+                w-12 h-12 rounded-full
+                flex items-center justify-center transition-all
+                ${isDarkMode ? 'bg-gray-800' : 'bg-gray-700'}
+                hover:scale-105 transform
+                shadow-lg`}
+        >
+            {children}
+        </button>
+    );
+
+    // Clean stat box design
     const StatBox = ({ label, value, onClick, color = '' }) => (
         <button 
             onClick={onClick}
             className={`bg-black/20 rounded-lg p-3 text-center 
-                hover:bg-opacity-30 transition-colors
-                ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
+                hover:bg-opacity-30 transition-all
+                ${onClick ? 'cursor-pointer hover:scale-105 transform' : 'cursor-default'}`}
         >
             <div className={`text-3xl font-bold ${color}`}>
                 {value}
@@ -532,6 +547,16 @@ export default function PoolScoringComponent() {
             <div className="text-sm opacity-60">{label}</div>
         </button>
     );
+
+    // Helper function to determine score color
+    const getScoreColor = (score, playerNum) => {
+        if (score >= targetGoal - 10) {
+            return 'text-green-400';
+        }
+        return isDarkMode 
+            ? playerNum === 1 ? 'text-blue-400' : 'text-orange-400'
+            : playerNum === 1 ? 'text-blue-600' : 'text-orange-600';
+    };
 
     return (
         <div className={`min-h-screen h-screen overflow-hidden transition-colors duration-200
@@ -724,27 +749,17 @@ export default function PoolScoringComponent() {
                         )}
 
                         <div className="text-center flex-grow flex flex-col justify-center">
-                            <div className={`text-8xl font-bold mb-4
-                                ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                            <div className={`text-8xl font-bold mb-4 transition-colors duration-300
+                                ${getScoreColor(player1.score, 1)}`}>
                                 {player1.score}
                             </div>
                             <div className="flex justify-center gap-4 mb-4">
-                                <button 
-                                    onClick={() => gameStarted && adjustScore(1, -1)}
-                                    className="text-2xl text-gray-400 hover:text-white 
-                                        w-12 h-12 rounded-full bg-gray-800/50 
-                                        flex items-center justify-center transition-colors"
-                                >
+                                <ScoreButton onClick={() => gameStarted && adjustScore(1, -1)} isDarkMode={isDarkMode}>
                                     −
-                                </button>
-                                <button 
-                                    onClick={() => gameStarted && adjustScore(1, 1)}
-                                    className="text-2xl text-gray-400 hover:text-white 
-                                        w-12 h-12 rounded-full bg-gray-800/50 
-                                        flex items-center justify-center transition-colors"
-                                >
+                                </ScoreButton>
+                                <ScoreButton onClick={() => gameStarted && adjustScore(1, 1)} isDarkMode={isDarkMode}>
                                     +
-                                </button>
+                                </ScoreButton>
                             </div>
                         </div>
 
@@ -805,27 +820,17 @@ export default function PoolScoringComponent() {
                         )}
 
                         <div className="text-center flex-grow flex flex-col justify-center">
-                            <div className={`text-8xl font-bold mb-4
-                                ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>
+                            <div className={`text-8xl font-bold mb-4 transition-colors duration-300
+                                ${getScoreColor(player2.score, 2)}`}>
                                 {player2.score}
                             </div>
                             <div className="flex justify-center gap-4 mb-4">
-                                <button 
-                                    onClick={() => gameStarted && adjustScore(2, -1)}
-                                    className="text-2xl text-gray-400 hover:text-white 
-                                        w-12 h-12 rounded-full bg-gray-800/50 
-                                        flex items-center justify-center transition-colors"
-                                >
+                                <ScoreButton onClick={() => gameStarted && adjustScore(2, -1)} isDarkMode={isDarkMode}>
                                     −
-                                </button>
-                                <button 
-                                    onClick={() => gameStarted && adjustScore(2, 1)}
-                                    className="text-2xl text-gray-400 hover:text-white 
-                                        w-12 h-12 rounded-full bg-gray-800/50 
-                                        flex items-center justify-center transition-colors"
-                                >
+                                </ScoreButton>
+                                <ScoreButton onClick={() => gameStarted && adjustScore(2, 1)} isDarkMode={isDarkMode}>
                                     +
-                                </button>
+                                </ScoreButton>
                             </div>
                         </div>
 
