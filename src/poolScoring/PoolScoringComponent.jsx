@@ -176,27 +176,25 @@ export default function PoolScoringComponent() {
     };
 
     const adjustScore = (playerNum, amount) => {
-        // Only allow scoring for active player
         if (playerNum !== activePlayer || !gameStarted) return;
 
-        // Save current state before making changes
         saveGameState();
 
         const currentPlayerState = playerNum === 1 ? player1 : player2;
         const setCurrentPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        const setFoulHistory = playerNum === 1 ? setPlayer1FoulHistory : setPlayer2FoulHistory;
         const newScore = currentPlayerState.score + amount;
         const newCurrentRun = amount > 0 ? currentPlayerState.currentRun + amount : 0;
         const newBestGameRun = Math.max(currentPlayerState.bestGameRun, newCurrentRun);
         
-        // Add to turn history
         addToTurnHistory(playerNum, 'Points', amount);
 
-        // Decrease ball count when points are scored and auto-reset when reaching 1
+        // Reset foul history when a ball is made
         if (amount > 0) {
+            setFoulHistory([]);  // Reset foul count on successful shot
             setObjectBallsOnTable(prev => {
                 const newCount = Math.max(0, prev - 1);
                 if (newCount <= 1) {
-                    // Add a small delay before resetting to 15 so the user sees it hit 1
                     setTimeout(() => setObjectBallsOnTable(15), 500);
                     return 1;
                 }
@@ -212,22 +210,18 @@ export default function PoolScoringComponent() {
             bestGameRun: newBestGameRun
         }));
 
-        // Switch turns if the shot wasn't successful (amount <= 0)
         if (amount <= 0) {
-            // If player 2 is ending their turn, increment inning
             if (playerNum === 2) {
                 setCurrentInning(prev => prev + 1);
             }
             
             setActivePlayer(playerNum === 1 ? 2 : 1);
-            // Reset current run for the player who just finished their turn
             setCurrentPlayer(prev => ({
                 ...prev,
                 currentRun: 0
             }));
         }
 
-        // Check for win condition
         if (newScore >= targetGoal) {
             const stats = calculateStats(currentPlayerState);
             setWinner(playerNum);
@@ -338,9 +332,8 @@ export default function PoolScoringComponent() {
             currentRun: 0
         });
         
-        setFoulHistory([]);
+        setFoulHistory([]);  // Reset foul history on miss
         
-        // Increment inning if Player 2's turn is ending
         if (playerNum === 2) {
             setCurrentInning(prev => prev + 1);
         }
