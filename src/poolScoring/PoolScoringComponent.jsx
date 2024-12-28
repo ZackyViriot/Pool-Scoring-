@@ -573,6 +573,34 @@ export default function PoolScoringComponent() {
             : playerNum === 1 ? 'text-blue-600' : 'text-orange-600';
     };
 
+    // Add intentional foul handler
+    const handleIntentionalFoul = (playerNum) => {
+        // Only allow actions for active player
+        if (playerNum !== activePlayer || !gameStarted) return;
+
+        saveGameState();
+        const player = playerNum === 1 ? player1 : player2;
+        const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        
+        // Add to turn history
+        addToTurnHistory(playerNum, 'Intentional Foul', -2);
+
+        setPlayer({
+            ...player,
+            score: player.score - 2,
+            fouls: player.fouls + 1,
+            currentRun: 0
+        });
+
+        // Check and apply three-foul penalty if needed
+        const isThreeFoulPenalty = checkThreeFouls(playerNum);
+        if (isThreeFoulPenalty) {
+            addToTurnHistory(playerNum, 'Three Foul Penalty', -16);
+        }
+        
+        setActivePlayer(playerNum === 1 ? 2 : 1);
+    };
+
     return (
         <div className={`min-h-screen h-screen overflow-hidden transition-colors duration-200
             ${isDarkMode 
@@ -807,8 +835,8 @@ export default function PoolScoringComponent() {
                                     color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
                                 />
                             </div>
-                            {/* Bottom row - 3 metrics */}
-                            <div className="grid grid-cols-3 gap-2">
+                            {/* Bottom row - 4 metrics */}
+                            <div className="grid grid-cols-4 gap-2">
                                 <StatBox 
                                     label="Best"
                                     value={player1.bestGameRun}
@@ -825,6 +853,12 @@ export default function PoolScoringComponent() {
                                     value={player1.fouls}
                                     onClick={() => gameStarted && handleFoul(1)}
                                     color="text-red-400"
+                                />
+                                <StatBox 
+                                    label="Int Foul"
+                                    value={player1.fouls}
+                                    onClick={() => gameStarted && handleIntentionalFoul(1)}
+                                    color="text-red-600"
                                 />
                             </div>
                         </div>
@@ -893,8 +927,8 @@ export default function PoolScoringComponent() {
                                     color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
                                 />
                             </div>
-                            {/* Bottom row - 3 metrics */}
-                            <div className="grid grid-cols-3 gap-2">
+                            {/* Bottom row - 4 metrics */}
+                            <div className="grid grid-cols-4 gap-2">
                                 <StatBox 
                                     label="Best"
                                     value={player2.bestGameRun}
@@ -911,6 +945,12 @@ export default function PoolScoringComponent() {
                                     value={player2.fouls}
                                     onClick={() => gameStarted && handleFoul(2)}
                                     color="text-red-400"
+                                />
+                                <StatBox 
+                                    label="Int Foul"
+                                    value={player2.fouls}
+                                    onClick={() => gameStarted && handleIntentionalFoul(2)}
+                                    color="text-red-600"
                                 />
                             </div>
                         </div>
