@@ -210,16 +210,17 @@ export default function PoolScoringComponent() {
 
         // Switch turns if the shot wasn't successful (amount <= 0)
         if (amount <= 0) {
+            // If player 2 is ending their turn, increment inning
+            if (playerNum === 2) {
+                setCurrentInning(prev => prev + 1);
+            }
+            
             setActivePlayer(playerNum === 1 ? 2 : 1);
             // Reset current run for the player who just finished their turn
             setCurrentPlayer(prev => ({
                 ...prev,
                 currentRun: 0
             }));
-            // Increment inning when player 2 finishes their turn
-            if (playerNum === 2) {
-                setCurrentInning(prev => prev + 1);
-            }
         }
 
         // Check for win condition
@@ -247,8 +248,7 @@ export default function PoolScoringComponent() {
         if (updatedHistory.length === 3 && updatedHistory.every(foul => foul)) {
             setPlayer(prev => ({
                 ...prev,
-                score: prev.score - 15,  // -15 instead of -16 since we already deducted -1 for the current foul
-                fouls: prev.fouls  // Don't increment fouls here since it was already incremented
+                score: prev.score - 16  // Full -16 penalty (includes the current foul)
             }));
             // Reset foul history after applying penalty
             setFoulHistory([]);
@@ -264,14 +264,12 @@ export default function PoolScoringComponent() {
     };
 
     const handleFoul = (playerNum) => {
-        // Only allow actions for active player
         if (playerNum !== activePlayer || !gameStarted) return;
 
         saveGameState();
         const player = playerNum === 1 ? player1 : player2;
         const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
         
-        // Add to turn history
         addToTurnHistory(playerNum, 'Foul', -1);
 
         setPlayer({
@@ -281,17 +279,20 @@ export default function PoolScoringComponent() {
             currentRun: 0
         });
 
-        // Check and apply three-foul penalty if needed
         const isThreeFoulPenalty = checkThreeFouls(playerNum);
         if (isThreeFoulPenalty) {
             addToTurnHistory(playerNum, 'Three Foul Penalty', -16);
+        }
+        
+        // Increment inning if Player 2's turn is ending
+        if (playerNum === 2) {
+            setCurrentInning(prev => prev + 1);
         }
         
         setActivePlayer(playerNum === 1 ? 2 : 1);
     };
 
     const handleSafe = (playerNum) => {
-        // Only allow actions for active player
         if (playerNum !== activePlayer || !gameStarted) return;
 
         saveGameState();
@@ -299,7 +300,6 @@ export default function PoolScoringComponent() {
         const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
         const setFoulHistory = playerNum === 1 ? setPlayer1FoulHistory : setPlayer2FoulHistory;
         
-        // Add to turn history
         addToTurnHistory(playerNum, 'Safe', 0);
 
         setPlayer({
@@ -309,11 +309,16 @@ export default function PoolScoringComponent() {
         });
         
         setFoulHistory([]);
+        
+        // Increment inning if Player 2's turn is ending
+        if (playerNum === 2) {
+            setCurrentInning(prev => prev + 1);
+        }
+        
         setActivePlayer(playerNum === 1 ? 2 : 1);
     };
 
     const handleMiss = (playerNum) => {
-        // Only allow actions for active player
         if (playerNum !== activePlayer || !gameStarted) return;
 
         saveGameState();
@@ -321,7 +326,6 @@ export default function PoolScoringComponent() {
         const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
         const setFoulHistory = playerNum === 1 ? setPlayer1FoulHistory : setPlayer2FoulHistory;
         
-        // Add to turn history
         addToTurnHistory(playerNum, 'Miss', 0);
 
         setPlayer({
@@ -331,6 +335,12 @@ export default function PoolScoringComponent() {
         });
         
         setFoulHistory([]);
+        
+        // Increment inning if Player 2's turn is ending
+        if (playerNum === 2) {
+            setCurrentInning(prev => prev + 1);
+        }
+        
         setActivePlayer(playerNum === 1 ? 2 : 1);
     };
 
@@ -357,28 +367,30 @@ export default function PoolScoringComponent() {
     };
 
     const handleScratch = (playerNum) => {
-        // Only allow actions for active player
         if (playerNum !== activePlayer || !gameStarted) return;
 
         saveGameState();
         const player = playerNum === 1 ? player1 : player2;
         const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
         
-        // Add to turn history
         addToTurnHistory(playerNum, 'Scratch', -1);
 
         setPlayer({
             ...player,
             score: player.score - 1,
             scratches: player.scratches + 1,
-            fouls: player.fouls + 1,  // Increment fouls as well
+            fouls: player.fouls + 1,
             currentRun: 0
         });
 
-        // Check and apply three-foul penalty if needed
         const isThreeFoulPenalty = checkThreeFouls(playerNum);
         if (isThreeFoulPenalty) {
             addToTurnHistory(playerNum, 'Three Foul Penalty', -16);
+        }
+        
+        // Increment inning if Player 2's turn is ending
+        if (playerNum === 2) {
+            setCurrentInning(prev => prev + 1);
         }
         
         setActivePlayer(playerNum === 1 ? 2 : 1);
@@ -481,7 +493,14 @@ export default function PoolScoringComponent() {
     const switchTurn = () => {
         if (gameStarted) {
             saveGameState();
+            
+            // If current player is player 2, we're completing a full inning
+            if (activePlayer === 2) {
+                setCurrentInning(prev => prev + 1);
+            }
+            
             setActivePlayer(activePlayer === 1 ? 2 : 1);
+            
             // Reset current run for the player who just finished their turn
             const currentPlayer = activePlayer === 1 ? player1 : player2;
             const setCurrentPlayer = activePlayer === 1 ? setPlayer1 : setPlayer2;
@@ -490,11 +509,6 @@ export default function PoolScoringComponent() {
                 ...prev,
                 currentRun: 0
             }));
-            
-            // Increment inning when player 2's turn ends (completing a full inning)
-            if (activePlayer === 2) {
-                setCurrentInning(prev => prev + 1);
-            }
         }
     };
 
@@ -583,14 +597,12 @@ export default function PoolScoringComponent() {
 
     // Add intentional foul handler
     const handleIntentionalFoul = (playerNum) => {
-        // Only allow actions for active player
         if (playerNum !== activePlayer || !gameStarted) return;
 
         saveGameState();
         const player = playerNum === 1 ? player1 : player2;
         const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
         
-        // Add to turn history
         addToTurnHistory(playerNum, 'Intentional Foul', -1);
 
         setPlayer({
@@ -600,10 +612,14 @@ export default function PoolScoringComponent() {
             currentRun: 0
         });
 
-        // Check and apply three-foul penalty if needed
         const isThreeFoulPenalty = checkThreeFouls(playerNum);
         if (isThreeFoulPenalty) {
             addToTurnHistory(playerNum, 'Three Foul Penalty', -16);
+        }
+        
+        // Increment inning if Player 2's turn is ending
+        if (playerNum === 2) {
+            setCurrentInning(prev => prev + 1);
         }
         
         setActivePlayer(playerNum === 1 ? 2 : 1);
