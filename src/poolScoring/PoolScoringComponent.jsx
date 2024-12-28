@@ -247,8 +247,8 @@ export default function PoolScoringComponent() {
         if (updatedHistory.length === 3 && updatedHistory.every(foul => foul)) {
             setPlayer(prev => ({
                 ...prev,
-                score: prev.score - 16,
-                fouls: prev.fouls + 1
+                score: prev.score - 15,  // -15 instead of -16 since we already deducted -1 for the current foul
+                fouls: prev.fouls  // Don't increment fouls here since it was already incremented
             }));
             // Reset foul history after applying penalty
             setFoulHistory([]);
@@ -591,11 +591,11 @@ export default function PoolScoringComponent() {
         const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
         
         // Add to turn history
-        addToTurnHistory(playerNum, 'Intentional Foul', -2);
+        addToTurnHistory(playerNum, 'Intentional Foul', -1);
 
         setPlayer({
             ...player,
-            score: player.score - 2,
+            score: player.score - 1,
             fouls: player.fouls + 1,
             currentRun: 0
         });
