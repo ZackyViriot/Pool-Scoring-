@@ -675,7 +675,7 @@ export default function PoolScoringComponent() {
 
         setPlayer({
             ...player,
-            score: player.score - 2,  // Changed from -1 to -2
+            score: player.score - 2,
             fouls: player.fouls + 1,
             currentRun: 0
         });
@@ -687,7 +687,7 @@ export default function PoolScoringComponent() {
 
         setObjectBallsOnTable(15);
         setIsBreakShot(true);
-        setActivePlayer(playerNum === 1 ? 2 : 1);
+        setActivePlayer(playerNum);
         setShowBreakFoulModal(false);
         setBreakFoulPlayer(null);
     };
