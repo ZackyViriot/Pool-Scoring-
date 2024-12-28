@@ -385,57 +385,65 @@ export default function PoolScoringComponent() {
     };
 
     const startGame = () => {
-        if (player1.name && player2.name) {
-            setGameStarted(true);
-            setIsTimerRunning(true);
-            setObjectBallsOnTable(15);
-            setCurrentInning(1);
-            setBreakPlayer(1);
-            setScoreHistory([]);
-            setBestRun(0);
-            setIsBreakShot(true);
-            setPlayer1FoulHistory([]);
-            setPlayer2FoulHistory([]);
-            setTurnHistory([]);
+        // Set default names if none provided
+        if (!player1.name) {
+            setPlayer1(prev => ({ ...prev, name: "Player 1" }));
+        }
+        if (!player2.name) {
+            setPlayer2(prev => ({ ...prev, name: "Player 2" }));
+        }
 
-            // Apply handicaps at game start
-            const player1Handicap = Number(player1.handicap) || 0;
-            const player2Handicap = Number(player2.handicap) || 0;
-            
-            // If player 1 has higher handicap, player 2 starts with the difference
-            // If player 2 has higher handicap, player 1 starts with the difference
-            const handicapDifference = player1Handicap - player2Handicap;
-            
-            // Reset scores and stats
-            setPlayer1(prev => ({
-                ...prev,
-                score: handicapDifference < 0 ? Math.abs(handicapDifference) : 0,
-                high: 0,
-                safes: 0,
-                misses: 0,
-                fouls: 0,
-                currentRun: 0,
-                bestGameRun: 0
-            }));
-            
-            setPlayer2(prev => ({
-                ...prev,
-                score: handicapDifference > 0 ? handicapDifference : 0,
-                high: 0,
-                safes: 0,
-                misses: 0,
-                fouls: 0,
-                currentRun: 0,
-                bestGameRun: 0
-            }));
+        setGameStarted(true);
+        setIsTimerRunning(true);
+        setObjectBallsOnTable(15);
+        setCurrentInning(1);
+        setBreakPlayer(1);
+        setScoreHistory([]);
+        setBestRun(0);
+        setIsBreakShot(true);
+        setPlayer1FoulHistory([]);
+        setPlayer2FoulHistory([]);
+        setTurnHistory([]);
 
-            // Add handicap application to turn history if there was a handicap
-            if (handicapDifference !== 0) {
-                if (handicapDifference > 0) {
-                    addToTurnHistory(2, 'Handicap Applied', handicapDifference);
-                } else if (handicapDifference < 0) {
-                    addToTurnHistory(1, 'Handicap Applied', Math.abs(handicapDifference));
-                }
+        // Apply handicaps at game start
+        const player1Handicap = Number(player1.handicap) || 0;
+        const player2Handicap = Number(player2.handicap) || 0;
+        
+        // If player 1 has higher handicap, player 2 starts with the difference
+        // If player 2 has higher handicap, player 1 starts with the difference
+        const handicapDifference = player1Handicap - player2Handicap;
+        
+        // Reset scores and stats
+        setPlayer1(prev => ({
+            ...prev,
+            name: prev.name || "Player 1",  // Ensure default name is set
+            score: handicapDifference < 0 ? Math.abs(handicapDifference) : 0,
+            high: 0,
+            safes: 0,
+            misses: 0,
+            fouls: 0,
+            currentRun: 0,
+            bestGameRun: 0
+        }));
+        
+        setPlayer2(prev => ({
+            ...prev,
+            name: prev.name || "Player 2",  // Ensure default name is set
+            score: handicapDifference > 0 ? handicapDifference : 0,
+            high: 0,
+            safes: 0,
+            misses: 0,
+            fouls: 0,
+            currentRun: 0,
+            bestGameRun: 0
+        }));
+
+        // Add handicap application to turn history if there was a handicap
+        if (handicapDifference !== 0) {
+            if (handicapDifference > 0) {
+                addToTurnHistory(2, 'Handicap Applied', handicapDifference);
+            } else if (handicapDifference < 0) {
+                addToTurnHistory(1, 'Handicap Applied', Math.abs(handicapDifference));
             }
         }
     };
