@@ -20,6 +20,8 @@ export default function PoolScoringComponent() {
     const [player2FoulHistory, setPlayer2FoulHistory] = useState([]);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [turnHistory, setTurnHistory] = useState([]);
+    const [showBreakFoulModal, setShowBreakFoulModal] = useState(false);
+    const [breakFoulPlayer, setBreakFoulPlayer] = useState(null);
     
     // Win modal state
     const [showWinModal, setShowWinModal] = useState(false);
@@ -52,6 +54,7 @@ export default function PoolScoringComponent() {
         safes: 0,
         misses: 0,
         fouls: 0,
+        intentionalFouls: 0,
         scratches: 0,
         currentRun: 0,
         bestGameRun: 0
@@ -65,6 +68,7 @@ export default function PoolScoringComponent() {
         safes: 0,
         misses: 0,
         fouls: 0,
+        intentionalFouls: 0,
         scratches: 0,
         currentRun: 0,
         bestGameRun: 0
@@ -590,9 +594,7 @@ export default function PoolScoringComponent() {
         if (score >= targetGoal - 10) {
             return 'text-green-400';
         }
-        return isDarkMode 
-            ? playerNum === 1 ? 'text-blue-400' : 'text-orange-400'
-            : playerNum === 1 ? 'text-blue-600' : 'text-orange-600';
+        return isDarkMode ? 'text-white brightness-150' : 'text-black';
     };
 
     // Add intentional foul handler
@@ -608,7 +610,8 @@ export default function PoolScoringComponent() {
         setPlayer({
             ...player,
             score: player.score - 1,
-            fouls: player.fouls + 1,
+            fouls: player.fouls + 1,  // Increment regular fouls too
+            intentionalFouls: player.intentionalFouls + 1,
             currentRun: 0
         });
 
@@ -617,12 +620,76 @@ export default function PoolScoringComponent() {
             addToTurnHistory(playerNum, 'Three Foul Penalty', -16);
         }
         
-        // Increment inning if Player 2's turn is ending
         if (playerNum === 2) {
             setCurrentInning(prev => prev + 1);
         }
         
         setActivePlayer(playerNum === 1 ? 2 : 1);
+    };
+
+    // Add handleBreakingFoul function
+    const handleBreakingFoul = (playerNum) => {
+        if (playerNum !== activePlayer || !gameStarted) return;
+        setBreakFoulPlayer(playerNum);
+        setShowBreakFoulModal(true);
+    };
+
+    // Update handleBreakFoulContinue function
+    const handleBreakFoulContinue = () => {
+        const playerNum = breakFoulPlayer;
+        const player = playerNum === 1 ? player1 : player2;
+        const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        
+        saveGameState();
+        addToTurnHistory(playerNum, 'Breaking Foul', -2);
+
+        setPlayer({
+            ...player,
+            score: player.score - 2,  // Changed from -1 to -2
+            fouls: player.fouls + 1,
+            currentRun: 0
+        });
+
+        const isThreeFoulPenalty = checkThreeFouls(playerNum);
+        if (isThreeFoulPenalty) {
+            addToTurnHistory(playerNum, 'Three Foul Penalty', -16);
+        }
+
+        if (playerNum === 2) {
+            setCurrentInning(prev => prev + 1);
+        }
+
+        setActivePlayer(playerNum === 1 ? 2 : 1);
+        setShowBreakFoulModal(false);
+        setBreakFoulPlayer(null);
+    };
+
+    // Update handleBreakFoulRebreak function
+    const handleBreakFoulRebreak = () => {
+        const playerNum = breakFoulPlayer;
+        const player = playerNum === 1 ? player1 : player2;
+        const setPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        
+        saveGameState();
+        addToTurnHistory(playerNum, 'Breaking Foul - Rebreak', -2);
+
+        setPlayer({
+            ...player,
+            score: player.score - 2,  // Changed from -1 to -2
+            fouls: player.fouls + 1,
+            currentRun: 0
+        });
+
+        const isThreeFoulPenalty = checkThreeFouls(playerNum);
+        if (isThreeFoulPenalty) {
+            addToTurnHistory(playerNum, 'Three Foul Penalty', -16);
+        }
+
+        setObjectBallsOnTable(15);
+        setIsBreakShot(true);
+        setActivePlayer(playerNum === 1 ? 2 : 1);
+        setShowBreakFoulModal(false);
+        setBreakFoulPlayer(null);
     };
 
     return (
@@ -756,6 +823,15 @@ export default function PoolScoringComponent() {
                                 </button>
 
                                 <button 
+                                    onClick={() => handleBreakingFoul(activePlayer)}
+                                    className="px-3 py-1 rounded-full text-xs
+                                        bg-red-500/20 text-red-400 hover:bg-red-500/30 
+                                        transition-colors duration-200"
+                                >
+                                    Breaking Foul
+                                </button>
+
+                                <button 
                                     onClick={switchTurn}
                                     className="px-3 py-1 rounded-full text-xs
                                         bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 
@@ -781,17 +857,6 @@ export default function PoolScoringComponent() {
                                 >
                                     History
                                 </button>
-
-                                {isBreakShot && (
-                                    <button 
-                                        onClick={() => handleBreakScratch(activePlayer)}
-                                        className="px-3 py-1 rounded-full text-xs
-                                            bg-red-500/20 text-red-400 hover:bg-red-500/30 
-                                            transition-colors duration-200"
-                                    >
-                                        Break Scratch
-                                    </button>
-                                )}
                             </>
                         )}
                     </div>
@@ -816,6 +881,12 @@ export default function PoolScoringComponent() {
                         )}
 
                         <div className="text-center flex-grow flex flex-col justify-center">
+                            {/* Add shooting indicator */}
+                            {activePlayer === 1 && gameStarted && (
+                                <div className="text-xl font-semibold mb-2 animate-pulse">
+                                    Shooting
+                                </div>
+                            )}
                             <div className={`text-8xl font-bold mb-4 transition-colors duration-300
                                 ${getScoreColor(player1.score, 1)}`}>
                                 {player1.score}
@@ -880,7 +951,7 @@ export default function PoolScoringComponent() {
                                 />
                                 <StatBox 
                                     label="Int Foul"
-                                    value={player1.fouls}
+                                    value={player1.intentionalFouls}
                                     onClick={() => gameStarted && handleIntentionalFoul(1)}
                                     color="text-red-600"
                                 />
@@ -908,6 +979,12 @@ export default function PoolScoringComponent() {
                         )}
 
                         <div className="text-center flex-grow flex flex-col justify-center">
+                            {/* Add shooting indicator */}
+                            {activePlayer === 2 && gameStarted && (
+                                <div className="text-xl font-semibold mb-2 animate-pulse">
+                                    Shooting
+                                </div>
+                            )}
                             <div className={`text-8xl font-bold mb-4 transition-colors duration-300
                                 ${getScoreColor(player2.score, 2)}`}>
                                 {player2.score}
@@ -972,7 +1049,7 @@ export default function PoolScoringComponent() {
                                 />
                                 <StatBox 
                                     label="Int Foul"
-                                    value={player2.fouls}
+                                    value={player2.intentionalFouls}
                                     onClick={() => gameStarted && handleIntentionalFoul(2)}
                                     color="text-red-600"
                                 />
@@ -1178,6 +1255,41 @@ export default function PoolScoringComponent() {
                             </div>
                         </div>
                     </>
+                )}
+
+                {/* Breaking Foul Modal */}
+                {showBreakFoulModal && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm 
+                        flex items-center justify-center z-50">
+                        <div className={`rounded-xl p-4 w-full max-w-md mx-4
+                            shadow-2xl animate-fadeIn transition-colors duration-200
+                            ${isDarkMode 
+                                ? 'bg-gradient-to-b from-gray-800 to-gray-900 border border-white/10' 
+                                : 'bg-gradient-to-b from-white to-gray-50 border border-gray-200'}`}>
+                            
+                            <h2 className="text-xl font-bold mb-4 text-center">Breaking Foul</h2>
+                            <p className="text-center mb-6 opacity-75">
+                                Would you like to continue playing or re-break?
+                            </p>
+
+                            <div className="flex justify-center gap-4">
+                                <button
+                                    onClick={handleBreakFoulContinue}
+                                    className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400
+                                        hover:bg-blue-500/30 transition-colors"
+                                >
+                                    Continue Playing
+                                </button>
+                                <button
+                                    onClick={handleBreakFoulRebreak}
+                                    className="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400
+                                        hover:bg-purple-500/30 transition-colors"
+                                >
+                                    Re-Break
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
