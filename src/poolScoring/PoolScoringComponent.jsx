@@ -146,6 +146,8 @@ export default function PoolScoringComponent() {
             setActivePlayer(lastAction.activePlayer);
             setCurrentInning(lastAction.currentInning);
             setObjectBallsOnTable(lastAction.objectBallsOnTable);
+            setPlayer1FoulHistory(lastAction.player1FoulHistory || []);
+            setPlayer2FoulHistory(lastAction.player2FoulHistory || []);
             setScoreHistory(prev => prev.slice(0, -1));
         }
     };
@@ -156,7 +158,9 @@ export default function PoolScoringComponent() {
             player2: { ...player2 },
             activePlayer,
             currentInning,
-            objectBallsOnTable
+            objectBallsOnTable,
+            player1FoulHistory: [...player1FoulHistory],
+            player2FoulHistory: [...player2FoulHistory]
         }]);
     };
 
@@ -210,6 +214,18 @@ export default function PoolScoringComponent() {
             bestGameRun: newBestGameRun
         }));
 
+        // Check for win condition before switching turns
+        if (newScore >= targetGoal) {
+            const stats = calculateStats(currentPlayerState);
+            setWinner(playerNum);
+            setWinnerStats(stats);
+            setShowWinModal(true);
+            setIsTimerRunning(false);
+            playWinSound();
+            return;  // Don't switch turns if game is won
+        }
+
+        // Only switch turns if no points were scored
         if (amount <= 0) {
             if (playerNum === 2) {
                 setCurrentInning(prev => prev + 1);
@@ -220,15 +236,6 @@ export default function PoolScoringComponent() {
                 ...prev,
                 currentRun: 0
             }));
-        }
-
-        if (newScore >= targetGoal) {
-            const stats = calculateStats(currentPlayerState);
-            setWinner(playerNum);
-            setWinnerStats(stats);
-            setShowWinModal(true);
-            setIsTimerRunning(false);
-            playWinSound();
         }
     };
 
@@ -685,6 +692,43 @@ export default function PoolScoringComponent() {
         setBreakFoulPlayer(null);
     };
 
+    // Update finishRack function
+    const finishRack = (playerNum) => {
+        if (playerNum !== activePlayer || !gameStarted) return;
+
+        saveGameState();
+        const currentPlayerState = playerNum === 1 ? player1 : player2;
+        const setCurrentPlayer = playerNum === 1 ? setPlayer1 : setPlayer2;
+        const setFoulHistory = playerNum === 1 ? setPlayer1FoulHistory : setPlayer2FoulHistory;
+        const remainingBalls = objectBallsOnTable;
+        
+        addToTurnHistory(playerNum, 'Finish Rack', remainingBalls);
+
+        setFoulHistory([]); // Reset foul history on successful finish
+        setObjectBallsOnTable(15); // Reset to 15 balls
+
+        const newScore = currentPlayerState.score + remainingBalls;
+        const newCurrentRun = currentPlayerState.currentRun + remainingBalls;
+
+        setCurrentPlayer(prev => ({
+            ...prev,
+            score: newScore,
+            currentRun: newCurrentRun,
+            high: Math.max(prev.high, newCurrentRun),
+            bestGameRun: Math.max(prev.bestGameRun, newCurrentRun)
+        }));
+
+        // Check for win condition
+        if (newScore >= targetGoal) {
+            const stats = calculateStats(currentPlayerState);
+            setWinner(playerNum);
+            setWinnerStats(stats);
+            setShowWinModal(true);
+            setIsTimerRunning(false);
+            playWinSound();
+        }
+    };
+
     return (
         <div className={`min-h-screen h-screen overflow-hidden transition-colors duration-200
             ${isDarkMode 
@@ -815,6 +859,17 @@ export default function PoolScoringComponent() {
                                     New Rack ({objectBallsOnTable})
                                 </button>
 
+                                {objectBallsOnTable > 1 && (
+                                    <button
+                                        onClick={() => finishRack(activePlayer)}
+                                        className="px-3 py-1 rounded-full text-xs
+                                            bg-green-500/20 text-green-400 hover:bg-green-500/30 
+                                            transition-colors duration-200"
+                                    >
+                                        Finish Rack (+{objectBallsOnTable})
+                                    </button>
+                                )}
+
                                 <button 
                                     onClick={() => handleBreakingFoul(activePlayer)}
                                     className="px-3 py-1 rounded-full text-xs
@@ -874,7 +929,6 @@ export default function PoolScoringComponent() {
                         )}
 
                         <div className="text-center flex-grow flex flex-col justify-center">
-                            {/* Add shooting indicator */}
                             {activePlayer === 1 && gameStarted && (
                                 <div className="text-xl font-semibold mb-2 animate-pulse">
                                     Shooting
@@ -887,9 +941,10 @@ export default function PoolScoringComponent() {
                             <div className="flex justify-center mb-4">
                                 <button 
                                     onClick={() => gameStarted && adjustScore(1, 1)}
-                                    className="text-2xl text-gray-400 hover:text-white 
-                                        w-12 h-12 rounded-full bg-gray-800/50 
-                                        flex items-center justify-center transition-colors"
+                                    className="text-5xl text-gray-400 hover:text-white 
+                                        w-32 h-32 rounded-full bg-gray-800/50 
+                                        flex items-center justify-center transition-colors
+                                        hover:scale-105 transform"
                                 >
                                     +
                                 </button>
@@ -901,16 +956,6 @@ export default function PoolScoringComponent() {
                             {/* Top row - 4 metrics */}
                             <div className="grid grid-cols-4 gap-2">
                                 <StatBox 
-                                    label="Run"
-                                    value={player1.currentRun}
-                                    color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
-                                />
-                                <StatBox 
-                                    label="High"
-                                    value={player1.high}
-                                    color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
-                                />
-                                <StatBox 
                                     label="Safe"
                                     value={player1.safes}
                                     onClick={() => gameStarted && handleSafe(1)}
@@ -920,6 +965,16 @@ export default function PoolScoringComponent() {
                                     label="Miss"
                                     value={player1.misses}
                                     onClick={() => gameStarted && handleMiss(1)}
+                                    color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                                />
+                                <StatBox 
+                                    label="Run"
+                                    value={player1.currentRun}
+                                    color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
+                                />
+                                <StatBox 
+                                    label="High"
+                                    value={player1.high}
                                     color={isDarkMode ? 'text-blue-400' : 'text-blue-600'}
                                 />
                             </div>
@@ -972,7 +1027,6 @@ export default function PoolScoringComponent() {
                         )}
 
                         <div className="text-center flex-grow flex flex-col justify-center">
-                            {/* Add shooting indicator */}
                             {activePlayer === 2 && gameStarted && (
                                 <div className="text-xl font-semibold mb-2 animate-pulse">
                                     Shooting
@@ -985,9 +1039,10 @@ export default function PoolScoringComponent() {
                             <div className="flex justify-center mb-4">
                                 <button 
                                     onClick={() => gameStarted && adjustScore(2, 1)}
-                                    className="text-2xl text-gray-400 hover:text-white 
-                                        w-12 h-12 rounded-full bg-gray-800/50 
-                                        flex items-center justify-center transition-colors"
+                                    className="text-5xl text-gray-400 hover:text-white 
+                                        w-32 h-32 rounded-full bg-gray-800/50 
+                                        flex items-center justify-center transition-colors
+                                        hover:scale-105 transform"
                                 >
                                     +
                                 </button>
@@ -999,16 +1054,6 @@ export default function PoolScoringComponent() {
                             {/* Top row - 4 metrics */}
                             <div className="grid grid-cols-4 gap-2">
                                 <StatBox 
-                                    label="Run"
-                                    value={player2.currentRun}
-                                    color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
-                                />
-                                <StatBox 
-                                    label="High"
-                                    value={player2.high}
-                                    color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
-                                />
-                                <StatBox 
                                     label="Safe"
                                     value={player2.safes}
                                     onClick={() => gameStarted && handleSafe(2)}
@@ -1018,6 +1063,16 @@ export default function PoolScoringComponent() {
                                     label="Miss"
                                     value={player2.misses}
                                     onClick={() => gameStarted && handleMiss(2)}
+                                    color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                                />
+                                <StatBox 
+                                    label="Run"
+                                    value={player2.currentRun}
+                                    color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
+                                />
+                                <StatBox 
+                                    label="High"
+                                    value={player2.high}
                                     color={isDarkMode ? 'text-orange-400' : 'text-orange-600'}
                                 />
                             </div>
